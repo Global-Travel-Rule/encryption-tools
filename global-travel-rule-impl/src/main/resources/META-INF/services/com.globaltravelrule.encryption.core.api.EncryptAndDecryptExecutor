@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2022-2025 Global Travel Rule • globaltravelrule.com
+# License that can be found in the LICENSE file.
+# Author: Global Travel Rule developer
+# Created on: 2025/6/9 12:19
+#
+
+com.globaltravelrule.encryption.impl.libsodium.Ed25519Curve25519Executor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp256r1Executor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp384r1Executor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp521r1Executor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSect256k1Executor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSect571k1Executor
+com.globaltravelrule.encryption.impl.bouncycastle.Keccak256HashExecutor
+com.globaltravelrule.encryption.impl.bouncycastle.RsaOaepSha1Mfg1Executor
