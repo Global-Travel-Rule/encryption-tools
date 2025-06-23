@@ -1,0 +1,131 @@
+/*
+ * Copyright (c) 2022-2025 Global Travel Rule • globaltravelrule.com
+ * License that can be found in the LICENSE file.
+ * Author: Global Travel Rule developer
+ * Created on: 2025/6/19 19:04
+ */
+
+package com.globaltravelrule.encryption.impl.libsodium;
+
+import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
+import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
+import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
+import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.sodium.LazySodium;
+import com.globaltravelrule.sodium.LazySodiumJava;
+import com.globaltravelrule.sodium.SodiumJava;
+import com.globaltravelrule.sodium.exceptions.SodiumException;
+import com.globaltravelrule.sodium.interfaces.AEAD;
+import com.globaltravelrule.sodium.interfaces.Box;
+import com.globaltravelrule.sodium.interfaces.MessageEncoder;
+import com.globaltravelrule.sodium.utils.Key;
+import com.globaltravelrule.sodium.utils.KeyPair;
+import com.globaltravelrule.sodium.utils.LibraryLoader;
+import org.bouncycastle.util.Arrays;
+import org.bouncycastle.util.encoders.Base64;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * executes encryption and decryption using Ed25519 and Curve25519 algorithms.
+ *
+ * @author Global Travel Rule developer
+ * @version 1.0.0
+ * @since 1.0.0
+ */
+public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
+
+    private static final LazySodium sodium;
+
+    static {
+        sodium = new LazySodiumJava(new SodiumJava(LibraryLoader.Mode.PREFER_BUNDLED), new MessageEncoder() {
+            @Override
+            public String encode(byte[] cipher) {
+                if (cipher == null || cipher.length == 0) {
+                    return "";
+                }
+                return Base64.toBase64String(cipher);
+            }
+
+            @Override
+            public byte[] decode(String cipherText) {
+                if (cipherText == null || cipherText.isEmpty()) {
+                    return new byte[0];
+                }
+                return Base64.decode(cipherText.getBytes(StandardCharsets.UTF_8));
+            }
+        });
+        sodium.sodiumInit();
+    }
+
+    @Override
+    public EncryptionAlgorithm getCryptionAlgorithm() {
+        return EncryptionAlgorithm.ED25519_CURVE25519;
+    }
+
+    @Override
+    public EncryptionKeyPair generateKeyPair() throws EncryptionException {
+        try {
+            Key seed = sodium.keygen(AEAD.Method.XCHACHA20_POLY1305_IETF);
+            KeyPair keyPair = sodium.cryptoSignSeedKeypair(seed.getAsBytes());
+            return new EncryptionKeyPair(Base64.toBase64String(keyPair.getPublicKey().getAsBytes()), Base64.toBase64String(keyPair.getSecretKey().getAsBytes()));
+        } catch (Exception ex) {
+            throw new EncryptionException("Failed to generate ED25519 key pair", ex);
+        }
+    }
+
+    @Override
+    public String encrypt(EncryptAndDecryptOptions options, String plaintext) throws EncryptionException {
+        try {
+            if (plaintext == null || plaintext.isEmpty()) {
+                return plaintext;
+            }
+            byte[] secretKey = generateSecretKey(options.getBase64RemotePublicKey(), options.getBase64HostedPrivateKey());
+
+            byte[] plainData = plaintext.getBytes(StandardCharsets.UTF_8);
+            byte[] nonce = sodium.randomBytesBuf(Box.NONCEBYTES);
+            byte[] encryptedData = new byte[plainData.length + Box.MACBYTES];
+            if (!sodium.cryptoBoxEasyAfterNm(encryptedData, plainData, plainData.length, nonce, secretKey)) {
+                throw new SodiumException("Could not encrypt data");
+            }
+
+            //拼接 nonce
+            byte[] encryptedFullData = new byte[nonce.length + encryptedData.length];
+            System.arraycopy(nonce, 0, encryptedFullData, 0, nonce.length);
+            System.arraycopy(encryptedData, 0, encryptedFullData, nonce.length, encryptedData.length);
+            return new String(Base64.encode(encryptedFullData));
+        } catch (Exception ex) {
+            throw new EncryptionException("Failed to encrypt data by Ed25519Curve25519", ex);
+        }
+    }
+
+    @Override
+    public String decrypt(EncryptAndDecryptOptions options, String base64Ciphertext) throws EncryptionException {
+        try {
+            if (base64Ciphertext == null || base64Ciphertext.isEmpty()) {
+                return base64Ciphertext;
+            }
+
+            byte[] secretKey = generateSecretKey(options.getBase64RemotePublicKey(), options.getBase64HostedPrivateKey());
+
+            // 分离nonce和密文
+            byte[] fullCiphertextData = Base64.decode(base64Ciphertext);
+            byte[] nonce = java.util.Arrays.copyOfRange(fullCiphertextData, 0, Box.NONCEBYTES);
+            byte[] ciphertextData = Arrays.copyOfRange(fullCiphertextData, Box.NONCEBYTES, fullCiphertextData.length);
+            byte[] plaintextData = new byte[ciphertextData.length - Box.MACBYTES];
+
+            if (!sodium.cryptoBoxOpenEasyAfterNm(plaintextData, ciphertextData, ciphertextData.length, nonce, secretKey)) {
+                throw new SodiumException("could not decrypt data");
+            }
+            return new String(plaintextData);
+        } catch (Exception ex) {
+            throw new EncryptionException("Failed to decrypt data by Ed25519Curve25519", ex);
+        }
+    }
+
+    private byte[] generateSecretKey(String base64RemotePublicKey, String base64HostedPrivateKey) throws SodiumException {
+        KeyPair curve25519KeyPair = sodium.convertKeyPairEd25519ToCurve25519(new KeyPair(Key.fromBase64String(base64RemotePublicKey), Key.fromBase64String(base64HostedPrivateKey)));
+        return sodium.cryptoBoxBeforeNm(curve25519KeyPair).getBytes(StandardCharsets.UTF_8);
+    }
+}
