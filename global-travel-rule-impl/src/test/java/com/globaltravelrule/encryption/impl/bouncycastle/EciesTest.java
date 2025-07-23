@@ -20,5 +20,7 @@ public class EciesTest extends BaseTest{
 
         doTestEncryptAndDecrypt(EncryptionAlgorithm.ECIES_SECP256K1);
         doTestEncryptAndDecrypt(EncryptionAlgorithm.ECIES_SECT571K1);
+
+        doTestEncryptAndDecrypt(EncryptionAlgorithm.ECIES_SECP384R1_TUBITAK);
     }
 }

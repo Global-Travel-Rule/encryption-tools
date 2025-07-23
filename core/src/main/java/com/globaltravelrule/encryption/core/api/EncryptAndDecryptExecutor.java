@@ -9,7 +9,7 @@ package com.globaltravelrule.encryption.core.api;
 
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 
 /**
@@ -41,22 +41,20 @@ public interface EncryptAndDecryptExecutor {
     /**
      * Encrypts the given plaintext using the specified encryption method.
      *
-     * @param options   the encryption and decryption options
-     * @param plaintext the plaintext to be encrypted
-     * @return the base64 encrypted ciphertext (base64)
+     * @param options the encryption and decryption options
+     * @return processed PiiSecuredInfo with base64 encrypted ciphertext
      */
-    default String encrypt(EncryptAndDecryptOptions options, String plaintext) throws EncryptionException {
-        return plaintext;
+    default String encrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
+        throw new EncryptionException("Not supported");
     }
 
     /**
      * Decrypts the given ciphertext using the specified encryption method.
      *
-     * @param options          the encryption and decryption options
-     * @param base64Ciphertext the base64 ciphertext to be decrypted (base64)
-     * @return the decrypted plaintext (base64)
+     * @param options the encryption and decryption options with base64 encrypted ciphertext
+     * @return processed PiiSecuredInfo with plaintext
      */
-    default String decrypt(EncryptAndDecryptOptions options, String base64Ciphertext) throws EncryptionException {
-        return base64Ciphertext;
+    default String decrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
+        throw new EncryptionException("Not supported");
     }
 }

@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 import com.globaltravelrule.encryption.impl.bouncycastle.utils.CryptoUtils;
 import org.bouncycastle.util.encoders.Base64;
@@ -71,10 +71,10 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
     }
 
     @Override
-    public String encrypt(EncryptAndDecryptOptions options, String plaintext) {
+    public String encrypt(EncryptionAndDecryptionOptions options) {
         try {
-            if (plaintext == null || plaintext.isEmpty()){
-                return plaintext;
+            if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
+                return options.getRawPayload();
             }
 
             Map<String, String> headerMap = new HashMap<>();
@@ -86,7 +86,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
             aesCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec, gcmParameterSpec);
             aesCipher.updateAAD(header.getBytes());
-            byte[] encryptedMessageFromPayload = aesCipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+            byte[] encryptedMessageFromPayload = aesCipher.doFinal(options.getRawPayload().getBytes(StandardCharsets.UTF_8));
 
             int tagPosition = encryptedMessageFromPayload.length - (GCM_TAG_BIT_LENGTH / 8);
             byte[] cipherTextBytes = CryptoUtils.subtractArray(encryptedMessageFromPayload, 0, tagPosition);
@@ -95,7 +95,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             algParams.init(new OAEPParameterSpec("SHA-1", "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT));
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
-            RSAPublicKey publicKey = CryptoUtils.parseRsaPublicKeyFromBase64(options.getBase64RemotePublicKey());
+            RSAPublicKey publicKey = CryptoUtils.parseRsaPublicKeyFromBase64(options.getReceiverKeyInfo().getPublicKey());
             rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey, algParams);
             byte[] encryptedAesKey = rsaCipher.doFinal(aesKeySpec.getEncoded());
 
@@ -117,13 +117,13 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
     }
 
     @Override
-    public String decrypt(EncryptAndDecryptOptions options, String base64Ciphertext) throws EncryptionException {
+    public String decrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
         try {
-            if (base64Ciphertext == null || base64Ciphertext.isEmpty()){
-                return base64Ciphertext;
+            if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
+                return options.getSecuredPayload();
             }
 
-            String[] parts = base64Ciphertext.split("\\.");
+            String[] parts = options.getSecuredPayload().split("\\.");
             String header = parts[0];
 
             byte[] encryptedAesKey = java.util.Base64.getUrlDecoder().decode(parts[1]);
@@ -135,7 +135,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             algParams.init(new OAEPParameterSpec("SHA-1", "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT));
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
-            RSAPrivateKey privateKey = CryptoUtils.parseRsaPrivateKeyFromBase64(options.getBase64HostedPrivateKey());
+            RSAPrivateKey privateKey = CryptoUtils.parseRsaPrivateKeyFromBase64(options.getReceiverKeyInfo().getPrivateKey());
             rsaCipher.init(Cipher.DECRYPT_MODE, privateKey, algParams);
             byte[] decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
 
@@ -144,6 +144,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
             aesCipher.init(Cipher.DECRYPT_MODE, aesKeySpec, gcmParameterSpec);
             aesCipher.updateAAD(header.getBytes());
+
             return new String(aesCipher.doFinal(CryptoUtils.concatArray(cipherText, gcmTag)),StandardCharsets.UTF_8);
         } catch (Exception ex) {
             throw new EncryptionException("Failed to decrypt data by AES GCM with RSA OAEP using SHA-1 and MFG1 padding", ex);

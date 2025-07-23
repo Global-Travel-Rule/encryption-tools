@@ -9,7 +9,7 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import org.bouncycastle.crypto.digests.KeccakDigest;
 import org.bouncycastle.util.encoders.Base64;
 
@@ -33,25 +33,26 @@ public class Keccak256HashExecutor implements EncryptAndDecryptExecutor {
      * Calculate the Keccak-256 hash value of the input data
      */
     @Override
-    public String encrypt(EncryptAndDecryptOptions options, String plaintext) throws EncryptionException {
-        if (plaintext == null || plaintext.isEmpty()){
-            return plaintext;
+    public String encrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
+        if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
+            return options.getRawPayload();
         }
 
-        // 创建Keccak-256摘要实例(256位输出)
+        // Create Keccak-256 Abstract Instance (256 bit Output)
         KeccakDigest keccak = new KeccakDigest(256);
 
-        // 更新输入数据
-        byte[] data = plaintext.getBytes(StandardCharsets.UTF_8);
+        // Update input data
+        String combined = options.getRawPayload() + options.getEncryptionParams().getKeccak256().getSalt();
+        byte[] data = combined.getBytes(StandardCharsets.UTF_8);
         keccak.update(data, 0, data.length);
 
-        // 准备输出缓冲区
+        // Prepare output buffer
         byte[] output = new byte[keccak.getDigestSize()];
 
-        // 计算哈希
+        // Calculate Hash
         keccak.doFinal(output, 0);
 
-        // 返回base64字符串
+        // return base64 string
         return Base64.toBase64String(output);
     }
 }

@@ -1,6 +1,6 @@
 # Encryption Tools Java Bindings
 
-[![License](https://img.shields.io/badge/license-MPL-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Java bindings for cryptographic tools library, specifically designed to support Global Travel Rule compliance
 requirements.
@@ -18,6 +18,7 @@ requirements.
     - ecies_secp521r1
     - ecies_secp256k1
     - ecies_sect571k1
+  - ecies_secp384r1_tubitak
 - Simple and intuitive Java API
 - Encryption and decryption support full-text, field, or recursive JSON string fields -
   see [EncryptionFormat.java](core/src/main/java/com/globaltravelrule/encryption/core/enums/EncryptionFormat.java)
@@ -77,21 +78,20 @@ requirements.
 
 ```groovy
 
-implementation 'com.globaltravelrule.encryption:core:1.0.0'
-implementation 'com.globaltravelrule.encryption:global-travel-rule-impl:1.0.0'
+implementation 'com.globaltravelrule.encryption:core:{LATEST_VERSION}'
+implementation 'com.globaltravelrule.encryption:global-travel-rule-impl:{LATEST_VERSION}'
 ```
 
 ### Usage
 
-#### Basic Example
+#### Basic com.globaltravelrule.encryption.Example
 
 ```java
-
-import com.globaltravelrule.encryption.core.EncryptionUtils;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.enums.EncryptionFormat;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.KeyInfo;
+import com.globaltravelrule.encryption.core.options.PiiSecuredInfo;
 
 public class Example {
 
@@ -105,24 +105,20 @@ public class Example {
         String originalMessage = "{\"test_num1\":0,\"test_num2\":1.01,\"test_bool\":true,\"test_string\":\"testing\",\"testing_object\":{\"testing_object_num1\":0,\"testing_object_num2\":1.01,\"testing_object_bool\":true,\"testing_object_string\":\"testing\"}}";
         System.out.println("raw message: " + originalMessage);
 
-        // encrypt message
-        EncryptAndDecryptOptions encryptOptions = new EncryptAndDecryptOptions(
-                EncryptionAlgorithm.ED25519_CURVE25519.getName(),
-                EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat(),
-                bobKp.getBase64PublicKey(),
-                aliceKp.getBase64privateKey()
-        );
-        String encryptedMessage = EncryptionUtils.encrypt(originalMessage, encryptOptions);
-        System.out.printf("encrypted message(%s): %s%n", encryptOptions.getEncryptFormat(), encryptedMessage);
+      PiiSecuredInfo piiSecuredInfo = new PiiSecuredInfo();
+      piiSecuredInfo.setSecretAlgorithm(EncryptionAlgorithm.ED25519_CURVE25519.getName());
+      piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
+
+      // encrypt message
+      piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
+      piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
+      piiSecuredInfo.setSecuredPayload(null);
+
+      String encryptedMessage = EncryptionUtils.encrypt(piiSecuredInfo, originalMessage).getSecuredPayload();
+      System.out.printf("encrypted message(%s): %s%n", piiSecuredInfo.getPiiSecretFormatType(), encryptedMessage);
 
         // decrypt message
-        EncryptAndDecryptOptions decryptOptions = new EncryptAndDecryptOptions(
-                EncryptionAlgorithm.ED25519_CURVE25519.getName(),
-                EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat(),
-                aliceKp.getBase64PublicKey(),
-                bobKp.getBase64privateKey()
-        );
-        String decryptedMessage = EncryptionUtils.decrypt(encryptedMessage, decryptOptions);
+      String decryptedMessage = EncryptionUtils.decrypt(piiSecuredInfo);
         System.out.println("decrypted message: " + decryptedMessage);
 
         assert originalMessage.equals(decryptedMessage);
@@ -169,7 +165,7 @@ public class Example {
 
 ### License
 
-MPL License - See [LICENSE.md](LICENSE.md) for details.
+MIT License - See [LICENSE](LICENSE) for details.
 
 ### Support
 

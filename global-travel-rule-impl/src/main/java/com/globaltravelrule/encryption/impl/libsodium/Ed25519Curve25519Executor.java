@@ -10,7 +10,7 @@ package com.globaltravelrule.encryption.impl.libsodium;
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 import com.globaltravelrule.sodium.LazySodium;
 import com.globaltravelrule.sodium.LazySodiumJava;
@@ -76,14 +76,14 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
     }
 
     @Override
-    public String encrypt(EncryptAndDecryptOptions options, String plaintext) throws EncryptionException {
+    public String encrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
         try {
-            if (plaintext == null || plaintext.isEmpty()) {
-                return plaintext;
+            if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
+                return options.getRawPayload();
             }
-            byte[] secretKey = generateSecretKey(options.getBase64RemotePublicKey(), options.getBase64HostedPrivateKey());
+            byte[] secretKey = generateSecretKey(options.getReceiverKeyInfo().getPublicKey(), options.getInitiatorKeyInfo().getPrivateKey());
 
-            byte[] plainData = plaintext.getBytes(StandardCharsets.UTF_8);
+            byte[] plainData = options.getRawPayload().getBytes(StandardCharsets.UTF_8);
             byte[] nonce = sodium.randomBytesBuf(Box.NONCEBYTES);
             byte[] encryptedData = new byte[plainData.length + Box.MACBYTES];
             if (!sodium.cryptoBoxEasyAfterNm(encryptedData, plainData, plainData.length, nonce, secretKey)) {
@@ -94,23 +94,26 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
             byte[] encryptedFullData = new byte[nonce.length + encryptedData.length];
             System.arraycopy(nonce, 0, encryptedFullData, 0, nonce.length);
             System.arraycopy(encryptedData, 0, encryptedFullData, nonce.length, encryptedData.length);
-            return new String(Base64.encode(encryptedFullData));
+
+            String securedPayload = new String(Base64.encode(encryptedFullData));
+            options.setSecuredPayload(securedPayload);
+            return securedPayload;
         } catch (Exception ex) {
             throw new EncryptionException("Failed to encrypt data by Ed25519Curve25519", ex);
         }
     }
 
     @Override
-    public String decrypt(EncryptAndDecryptOptions options, String base64Ciphertext) throws EncryptionException {
+    public String decrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
         try {
-            if (base64Ciphertext == null || base64Ciphertext.isEmpty()) {
-                return base64Ciphertext;
+            if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
+                return options.getSecuredPayload();
             }
 
-            byte[] secretKey = generateSecretKey(options.getBase64RemotePublicKey(), options.getBase64HostedPrivateKey());
+            byte[] secretKey = generateSecretKey(options.getInitiatorKeyInfo().getPublicKey(), options.getReceiverKeyInfo().getPrivateKey());
 
             // 分离nonce和密文
-            byte[] fullCiphertextData = Base64.decode(base64Ciphertext);
+            byte[] fullCiphertextData = Base64.decode(options.getSecuredPayload());
             byte[] nonce = java.util.Arrays.copyOfRange(fullCiphertextData, 0, Box.NONCEBYTES);
             byte[] ciphertextData = Arrays.copyOfRange(fullCiphertextData, Box.NONCEBYTES, fullCiphertextData.length);
             byte[] plaintextData = new byte[ciphertextData.length - Box.MACBYTES];
@@ -118,7 +121,10 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
             if (!sodium.cryptoBoxOpenEasyAfterNm(plaintextData, ciphertextData, ciphertextData.length, nonce, secretKey)) {
                 throw new SodiumException("could not decrypt data");
             }
-            return new String(plaintextData);
+
+            String rawPayload = new String(plaintextData, StandardCharsets.UTF_8);
+            options.setRawPayload(rawPayload);
+            return rawPayload;
         } catch (Exception ex) {
             throw new EncryptionException("Failed to decrypt data by Ed25519Curve25519", ex);
         }

@@ -31,11 +31,10 @@
         <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
         <maven-deploy-plugin.version>3.0.0</maven-deploy-plugin.version>
 
-        <core.version>1.0.0</core.version>
-        <impl.version>1.0.0</impl.version>
+        <core.version>1.0.1</core.version>
+        <impl.version>1.0.1</impl.version>
 
         <!-- dependency lib version -->
-        <tink.version>1.17.0</tink.version>
         <junit.version>4.13.2</junit.version>
         <slf4j-api.version>1.7.36</slf4j-api.version>
     </properties>
