@@ -18,7 +18,7 @@ requirements.
     - ecies_secp521r1
     - ecies_secp256k1
     - ecies_sect571k1
-  - ecies_secp384r1_tubitak
+    - ecies_secp384r1_tubitak
 - Simple and intuitive Java API
 - Encryption and decryption support full-text, field, or recursive JSON string fields -
   see [EncryptionFormat.java](core/src/main/java/com/globaltravelrule/encryption/core/enums/EncryptionFormat.java)
@@ -105,20 +105,20 @@ public class Example {
         String originalMessage = "{\"test_num1\":0,\"test_num2\":1.01,\"test_bool\":true,\"test_string\":\"testing\",\"testing_object\":{\"testing_object_num1\":0,\"testing_object_num2\":1.01,\"testing_object_bool\":true,\"testing_object_string\":\"testing\"}}";
         System.out.println("raw message: " + originalMessage);
 
-      PiiSecuredInfo piiSecuredInfo = new PiiSecuredInfo();
-      piiSecuredInfo.setSecretAlgorithm(EncryptionAlgorithm.ED25519_CURVE25519.getName());
-      piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
+        PiiSecuredInfo piiSecuredInfo = new PiiSecuredInfo();
+        piiSecuredInfo.setSecretAlgorithm(EncryptionAlgorithm.ED25519_CURVE25519.getName());
+        piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
 
-      // encrypt message
-      piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
-      piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
-      piiSecuredInfo.setSecuredPayload(null);
+        // encrypt message
+        piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
+        piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
+        piiSecuredInfo.setSecuredPayload(null);
 
-      String encryptedMessage = EncryptionUtils.encrypt(piiSecuredInfo, originalMessage).getSecuredPayload();
-      System.out.printf("encrypted message(%s): %s%n", piiSecuredInfo.getPiiSecretFormatType(), encryptedMessage);
+        String encryptedMessage = EncryptionUtils.encrypt(piiSecuredInfo, originalMessage).getSecuredPayload();
+        System.out.printf("encrypted message(%s): %s%n", piiSecuredInfo.getPiiSecretFormatType(), encryptedMessage);
 
         // decrypt message
-      String decryptedMessage = EncryptionUtils.decrypt(piiSecuredInfo);
+        String decryptedMessage = EncryptionUtils.decrypt(piiSecuredInfo);
         System.out.println("decrypted message: " + decryptedMessage);
 
         assert originalMessage.equals(decryptedMessage);
