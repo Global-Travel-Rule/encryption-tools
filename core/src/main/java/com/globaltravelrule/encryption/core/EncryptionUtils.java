@@ -14,8 +14,9 @@ import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.enums.EncryptionFormat;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.PiiSecuredInfo;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -91,36 +92,65 @@ public class EncryptionUtils {
      * Encrypt the plain text using the specified algorithm and options.
      * Decrypt the encrypted text using the specified algorithm and options.
      *
-     * @param text    the plain text to be encrypted or decrypted
-     * @param options the encryption options
-     * @return the encrypted or decrypted text
+     * @param options the encryption or decryption info
      */
-    private String doEncryptAndDecrypt(String text, EncryptAndDecryptOptions options, String action) {
-        EncryptAndDecryptExecutor executor = getCryptionExecutor(options.getAlgorithm());
-        if (EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat().equals(options.getEncryptFormat())) {
-            return encryptAndDecryptString(text, executor, options, action);
+    private void doEncryptAndDecrypt(EncryptionAndDecryptionOptions options, String action) {
+        EncryptAndDecryptExecutor executor = getCryptionExecutor(options.getSecretAlgorithm());
+        String payload;
+        EncryptionFormat format = EncryptionFormat.parse(options.getPiiSecretFormatType());
+        switch (format) {
+            case FULL_JSON_OBJECT_ENCRYPT:
+                payload = encryptAndDecryptString(executor, options, action);
+                break;
+            case JSON_FIELD_ENCRYPT:
+            case JSON_FIELD_HASHED:
+                payload = encryptAndDecryptJsonData(executor, options, action);
+                break;
+            default:
+                throw new EncryptionException("Unsupported PII Secret Format Type: " + options.getPiiSecretFormatType());
         }
-        if (EncryptionFormat.JSON_FIELD_ENCRYPT.getFormat().equals(options.getEncryptFormat())) {
-            return encryptAndDecryptJsonData(text, executor, options, action);
-        }
-        if (EncryptionFormat.JSON_FIELD_HASHED.getFormat().equals(options.getEncryptFormat())) {
-            return encryptAndDecryptJsonData(text, executor, options, action);
-        }
-        return encryptAndDecryptString(text, executor, options, action);
+        processPiiSecuredInfo(payload, options, action);
     }
 
+    private void processPiiSecuredInfo(String payload, EncryptionAndDecryptionOptions options, String action) {
+        if (ENCRYPTION_ACTION.equals(action)) {
+            options.setSecuredPayload(payload);
+
+            //clear sensitive information
+            options.setRawPayload(null);
+            if (options.getInitiatorKeyInfo() != null) {
+                options.getInitiatorKeyInfo().setPrivateKey(null);
+            }
+        }
+        if (DECRYPTION_ACTION.equals(action)) {
+            options.setRawPayload(payload);
+
+            //clear sensitive information
+            options.setSecuredPayload(null);
+            if (options.getReceiverKeyInfo() != null) {
+                options.getReceiverKeyInfo().setPrivateKey(null);
+            }
+        }
+    }
 
     /**
      * Encrypt all strings and basic type fields in JSON strings
      *
-     * @param jsonString Original JSON string
-     * @param executor   CryptionExecutor instance for encryption
-     * @param options    options for encryption and decryption
-     * @param action     "encrypt" or "decrypt"
+     * @param executor CryptionExecutor instance for encryption
+     * @param options  info for encryption and decryption
+     * @param action   "encrypt" or "decrypt"
      * @return Encrypted JSON string
      * @throws EncryptionException If JSON is illegal or encryption error occurs
      */
-    public String encryptAndDecryptJsonData(String jsonString, EncryptAndDecryptExecutor executor, EncryptAndDecryptOptions options, String action) {
+    private String encryptAndDecryptJsonData(EncryptAndDecryptExecutor executor, EncryptionAndDecryptionOptions options, String action) {
+        String jsonString = "";
+        if (ENCRYPTION_ACTION.equals(action)) {
+            jsonString = options.getRawPayload();
+        }
+        if (DECRYPTION_ACTION.equals(action)) {
+            jsonString = options.getSecuredPayload();
+        }
+
         // 1. Verify if JSON is valid
         JsonNode rootNode;
         try {
@@ -131,6 +161,14 @@ public class EncryptionUtils {
 
         // 2. Recursive processing of all fields
         JsonNode processedNode = encryptAndDecryptNode(rootNode, executor, options, action);
+
+        // Backfill original value
+        if (ENCRYPTION_ACTION.equals(action)) {
+            options.setRawPayload(jsonString);
+        }
+        if (DECRYPTION_ACTION.equals(action)) {
+            options.setSecuredPayload(jsonString);
+        }
 
         // 3. Return the processed JSON string
         try {
@@ -143,7 +181,7 @@ public class EncryptionUtils {
     /**
      * Recursive processing of JSON nodes
      */
-    private JsonNode encryptAndDecryptNode(JsonNode node, EncryptAndDecryptExecutor executor, EncryptAndDecryptOptions options, String action) {
+    private JsonNode encryptAndDecryptNode(JsonNode node, EncryptAndDecryptExecutor executor, EncryptionAndDecryptionOptions options, String action) {
         if (node.isObject()) {
             ObjectNode objectNode = (ObjectNode) node;
             ObjectNode newObjectNode = objectMapper.createObjectNode();
@@ -172,9 +210,9 @@ public class EncryptionUtils {
         }
     }
 
-    private JsonNode encryptAndDecryptJson(JsonNode jsonNode, EncryptAndDecryptExecutor executor, EncryptAndDecryptOptions options, String action) {
+    private JsonNode encryptAndDecryptJson(JsonNode jsonNode, EncryptAndDecryptExecutor executor, EncryptionAndDecryptionOptions options, String action) {
         if (options == null) {
-            throw new EncryptionException("Encryption and decryption options cannot be null");
+            throw new EncryptionException("Encryption and decryption info cannot be null");
         }
         if (jsonNode == null || jsonNode.isNull()) {
             return jsonNode;
@@ -189,7 +227,8 @@ public class EncryptionUtils {
             try {
                 String metadataStr = objectMapper.writeValueAsString(metadata);
                 // Encrypt basic types (numbers, boolean values) after converting them to strings
-                String encryptedValue = executor.encrypt(options, metadataStr);
+                options.setRawPayload(metadataStr);
+                String encryptedValue = executor.encrypt(options);
                 return new TextNode(encryptedValue);
             } catch (Exception ex) {
                 throw new EncryptionException("encrypt node fail", ex);
@@ -197,7 +236,8 @@ public class EncryptionUtils {
         }
 
         if (DECRYPTION_ACTION.equals(action)) {
-            String metadataStr = executor.decrypt(options, jsonNode.asText());
+            options.setSecuredPayload(jsonNode.asText());
+            String metadataStr = executor.decrypt(options);
             try {
                 var metadata = objectMapper.readValue(metadataStr, Map.class);
                 String type = String.valueOf(metadata.get("type"));
@@ -210,23 +250,25 @@ public class EncryptionUtils {
         return jsonNode;
     }
 
-    private String encryptAndDecryptString(String textData, EncryptAndDecryptExecutor executor, EncryptAndDecryptOptions options, String action) {
+    private String encryptAndDecryptString(EncryptAndDecryptExecutor executor, EncryptionAndDecryptionOptions options, String action) {
         if (options == null) {
-            throw new EncryptionException("Encryption and decryption options cannot be null");
-        }
-
-        if (textData == null || textData.isEmpty()) {
-            return textData;
+            throw new EncryptionException("Encryption and decryption info cannot be null");
         }
 
         if (ENCRYPTION_ACTION.equals(action)) {
-            return executor.encrypt(options, textData);
+            if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
+                return options.getRawPayload();
+            }
+            return executor.encrypt(options);
         }
 
         if (DECRYPTION_ACTION.equals(action)) {
-            return executor.decrypt(options, textData);
+            if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
+                return options.getSecuredPayload();
+            }
+            return executor.decrypt(options);
         }
-        return textData;
+        throw new EncryptionException("Encryption or decryption action invalid");
     }
 
     private static String getValueType(JsonNode node) {
@@ -278,24 +320,40 @@ public class EncryptionUtils {
     }
 
     /**
-     * Encrypt the plain text using the specified algorithm and options.
+     * Encrypts the given plaintext using the specified encryption method.
      *
-     * @param plainText the plain text to be encrypted
-     * @param options   the encryption options
-     * @return the encrypted text
+     * @param piiSecuredInfo the encryption and decryption options with plaintext
+     * @return processed PiiSecuredInfo with base64 encrypted ciphertext
      */
-    public static String encrypt(String plainText, EncryptAndDecryptOptions options) {
-        return EncryptionUtils.getInstance().doEncryptAndDecrypt(plainText, options, ENCRYPTION_ACTION);
+    public static PiiSecuredInfo encrypt(PiiSecuredInfo piiSecuredInfo, String rawPayload) {
+        EncryptionAndDecryptionOptions options = EncryptionAndDecryptionOptions.withPiiSecuredInfo(piiSecuredInfo);
+        options.setRawPayload(rawPayload);
+        EncryptionUtils.getInstance().doEncryptAndDecrypt(options, ENCRYPTION_ACTION);
+
+        piiSecuredInfo.setInitiatorKeyInfo(options.getInitiatorKeyInfo());
+        piiSecuredInfo.setReceiverKeyInfo(options.getReceiverKeyInfo());
+        piiSecuredInfo.setSecretAlgorithm(options.getSecretAlgorithm());
+        piiSecuredInfo.setPiiSecretFormatType(options.getPiiSecretFormatType());
+        piiSecuredInfo.setSecuredPayload(options.getSecuredPayload());
+        return piiSecuredInfo;
     }
 
     /**
-     * Decrypt the encrypted text using the specified algorithm and options.
+     * Decrypts the given ciphertext using the specified encryption method.
      *
-     * @param encryptedText the encrypted text to be decrypted
-     * @param options       the decryption options
-     * @return the decrypted text
+     * @param piiSecuredInfo the encryption and decryption options with base64 encrypted ciphertext
+     * @return decrypt plaintext
      */
-    public static String decrypt(String encryptedText, EncryptAndDecryptOptions options) {
-        return EncryptionUtils.getInstance().doEncryptAndDecrypt(encryptedText, options, DECRYPTION_ACTION);
+    public static String decrypt(PiiSecuredInfo piiSecuredInfo) {
+        EncryptionAndDecryptionOptions options = EncryptionAndDecryptionOptions.withPiiSecuredInfo(piiSecuredInfo);
+        options.setSecuredPayload(piiSecuredInfo.getSecuredPayload());
+        EncryptionUtils.getInstance().doEncryptAndDecrypt(options, DECRYPTION_ACTION);
+
+        piiSecuredInfo.setInitiatorKeyInfo(options.getInitiatorKeyInfo());
+        piiSecuredInfo.setReceiverKeyInfo(options.getReceiverKeyInfo());
+        piiSecuredInfo.setSecretAlgorithm(options.getSecretAlgorithm());
+        piiSecuredInfo.setPiiSecretFormatType(options.getPiiSecretFormatType());
+        piiSecuredInfo.setSecuredPayload(options.getSecuredPayload());
+        return options.getRawPayload();
     }
 }

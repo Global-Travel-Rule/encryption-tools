@@ -9,6 +9,7 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 import com.globaltravelrule.encryption.impl.bouncycastle.enums.CurveType;
 import org.bouncycastle.jce.ECNamedCurveTable;
@@ -66,19 +67,18 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
     /**
      * Encrypted data
      *
-     * @param base64PublicKey Receiver's public key(base64)
-     * @param plaintext       Data to be encrypted
-     * @param curveType       curve type
+     * @param options   encryption info
+     * @param curveType curve type
      * @return encrypted data (base64)
      */
-    protected String encrypt(String base64PublicKey, String plaintext, CurveType curveType) {
+    protected String encrypt(EncryptionAndDecryptionOptions options, CurveType curveType) {
         try {
-            if (plaintext == null || plaintext.isEmpty()) {
-                return plaintext;
+            if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
+                return options.getRawPayload();
             }
 
             // 1. Ensure to use non-compressed format
-            ECPublicKey receiverPubKey = (ECPublicKey) base64ToPublicKey(base64PublicKey);
+            ECPublicKey receiverPubKey = (ECPublicKey) base64ToPublicKey(options.getReceiverKeyInfo().getPublicKey());
 
             byte[] uncompressedPubKey = toUncompressedPoint(receiverPubKey);
             ECPublicKey normalizedKey = parseECPublicKey(uncompressedPubKey, curveType.getCurveName());
@@ -93,11 +93,13 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
 
             // 3. Encrypt and combine data packets
             cipher.init(Cipher.ENCRYPT_MODE, normalizedKey, params);
-            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            return Base64.toBase64String(ByteBuffer.allocate(16 + ciphertext.length)
+            byte[] ciphertext = cipher.doFinal(options.getRawPayload().getBytes(StandardCharsets.UTF_8));
+            String securedPayload = Base64.toBase64String(ByteBuffer.allocate(16 + ciphertext.length)
                     .put(nonce)
                     .put(ciphertext)
                     .array());
+            options.setSecuredPayload(securedPayload);
+            return securedPayload;
         } catch (Exception ex) {
             throw new EncryptionException("Failed to encrypt data by ECIES", ex);
         }
@@ -106,18 +108,17 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
     /**
      * Decrypt data
      *
-     * @param base64PrivateKey Recipient's private key(base64)
-     * @param base64Ciphertext Decrypt data(base64)
-     * @param curveType        curve type
+     * @param options   decryption info
+     * @param curveType curve type
      * @return decrypted plaintext
      */
-    protected String decrypt(String base64PrivateKey, String base64Ciphertext, CurveType curveType) {
+    protected String decrypt(EncryptionAndDecryptionOptions options, CurveType curveType) {
         try {
-            if (base64Ciphertext == null || base64Ciphertext.isEmpty()) {
-                return base64Ciphertext;
+            if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
+                return options.getSecuredPayload();
             }
 
-            byte[] ciphertextData = Base64.decode(base64Ciphertext);
+            byte[] ciphertextData = Base64.decode(options.getSecuredPayload());
 
             Cipher cipher = Cipher.getInstance("ECIESwithAES-CBC", "BC");
             IESParameterSpec params = new IESParameterSpec(
@@ -125,8 +126,10 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
                     extractNonceFromCiphertext(ciphertextData),
                     false
             );
-            cipher.init(Cipher.DECRYPT_MODE, base64ToPrivateKey(base64PrivateKey), params);
-            return new String(cipher.doFinal(removeNonceFromCiphertext(ciphertextData)));
+            cipher.init(Cipher.DECRYPT_MODE, base64ToPrivateKey(options.getReceiverKeyInfo().getPrivateKey()), params);
+            String rawPayload = new String(cipher.doFinal(removeNonceFromCiphertext(ciphertextData)));
+            options.setRawPayload(rawPayload);
+            return rawPayload;
         } catch (Exception ex) {
             throw new EncryptionException("Failed to decrypt data by ECIES", ex);
         }
@@ -159,13 +162,6 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
         return nonce;
     }
 
-    // Base64 to public key conversion
-    private PublicKey base64ToPublicKey(String base64Key) throws Exception {
-        byte[] decoded = Base64.decode(base64Key);
-        KeyFactory kf = KeyFactory.getInstance("EC", "BC");
-        return kf.generatePublic(new X509EncodedKeySpec(decoded));
-    }
-
     // Convert the public key to a standard uncompressed format (65 bytes, starting with 0x04)
     private byte[] toUncompressedPoint(ECPublicKey pubKey) {
         return pubKey.getQ().getEncoded(false); // false表示非压缩
@@ -180,13 +176,19 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
                 .generatePublic(new ECPublicKeySpec(point, ecSpec));
     }
 
+    // Base64 to public key conversion
+    protected PublicKey base64ToPublicKey(String base64Key) throws Exception {
+        byte[] decoded = Base64.decode(base64Key);
+        KeyFactory kf = KeyFactory.getInstance("EC", "BC");
+        return kf.generatePublic(new X509EncodedKeySpec(decoded));
+    }
+
     // Base64 to private key conversion
-    private PrivateKey base64ToPrivateKey(String base64Key) throws Exception {
+    protected PrivateKey base64ToPrivateKey(String base64Key) throws Exception {
         byte[] decoded = Base64.decode(base64Key);
         KeyFactory kf = KeyFactory.getInstance("EC", "BC");
         return kf.generatePrivate(new PKCS8EncodedKeySpec(decoded));
     }
-
 
     // Extract nonce from composite data
     private byte[] extractNonceFromCiphertext(byte[] combined) {

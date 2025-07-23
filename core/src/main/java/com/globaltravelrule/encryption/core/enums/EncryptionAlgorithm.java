@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * Encryption algorithm enum.
  *
  * @author Global Travel Rule developer
- * @version 1.0.0
+ * @version 1.0.1
  * @since 1.0.0
  */
 public enum EncryptionAlgorithm {
@@ -26,7 +26,8 @@ public enum EncryptionAlgorithm {
     ECIES_SECP384R1("ecies_secp384r1", "ecies_secp384r1 encryption"),
     ECIES_SECP521R1("ecies_secp521r1", "ecies_secp521r1 encryption"),
     ECIES_SECP256K1("ecies_secp256k1", "ecies_secp256k1 encryption"),
-    ECIES_SECT571K1("ecies_sect571k1", "ecies_sect571k1 encryption");
+    ECIES_SECT571K1("ecies_sect571k1", "ecies_sect571k1 encryption"),
+    ECIES_SECP384R1_TUBITAK("ecies_secp256r1_tubitak", "ecies_secp256r1_tubitak encryption");
 
     private static final Map<String, EncryptionAlgorithm> MAP;
 

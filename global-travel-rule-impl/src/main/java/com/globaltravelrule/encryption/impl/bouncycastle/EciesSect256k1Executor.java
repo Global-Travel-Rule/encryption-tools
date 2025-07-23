@@ -9,7 +9,7 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
-import com.globaltravelrule.encryption.core.options.EncryptAndDecryptOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 import com.globaltravelrule.encryption.impl.bouncycastle.enums.CurveType;
 
@@ -33,12 +33,12 @@ public class EciesSect256k1Executor extends EciesExecutor {
     }
 
     @Override
-    public String encrypt(EncryptAndDecryptOptions options, String plaintext) throws EncryptionException {
-        return encrypt(options.getBase64RemotePublicKey(), plaintext, CurveType.SECT256K1);
+    public String encrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
+        return encrypt(options, CurveType.SECT256K1);
     }
 
     @Override
-    public String decrypt(EncryptAndDecryptOptions options, String base64Ciphertext) throws EncryptionException {
-        return decrypt(options.getBase64HostedPrivateKey(), base64Ciphertext, CurveType.SECT256K1);
+    public String decrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
+        return decrypt(options, CurveType.SECT256K1);
     }
 }
