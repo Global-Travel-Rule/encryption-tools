@@ -27,7 +27,7 @@ public enum EncryptionAlgorithm {
     ECIES_SECP521R1("ecies_secp521r1", "ecies_secp521r1 encryption"),
     ECIES_SECP256K1("ecies_secp256k1", "ecies_secp256k1 encryption"),
     ECIES_SECT571K1("ecies_sect571k1", "ecies_sect571k1 encryption"),
-    ECIES_SECP384R1_TUBITAK("ecies_secp256r1_tubitak", "ecies_secp256r1_tubitak encryption");
+    ECIES_SECP384R1_TUBITAK("ecies_secp384r1_tubitak", "ecies_secp384r1_tubitak encryption");
 
     private static final Map<String, EncryptionAlgorithm> MAP;
 
