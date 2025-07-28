@@ -8,10 +8,14 @@
 package com.globaltravelrule.encryption.impl.bouncycastle;
 
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
+import com.globaltravelrule.encryption.core.enums.EncryptionKeyFormat;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.impl.bouncycastle.enums.CurveType;
+import com.globaltravelrule.encryption.impl.bouncycastle.utils.CryptoUtils;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.interfaces.ECPublicKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -19,14 +23,14 @@ import org.bouncycastle.jce.spec.ECParameterSpec;
 import org.bouncycastle.jce.spec.ECPublicKeySpec;
 import org.bouncycastle.jce.spec.IESParameterSpec;
 import org.bouncycastle.math.ec.ECPoint;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.util.encoders.Base64;
 
 import javax.crypto.Cipher;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 
 /**
  * Ecies encryption and decryption base class
@@ -47,18 +51,26 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    protected EncryptionKeyPair doGenerateKeyPair(CurveType curveType) throws EncryptionException {
+    protected EncryptionKeyPair doGenerateKeyPair(GenerateKeyPairOptions options, CurveType curveType) throws EncryptionException {
         try {
             ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec(curveType.getCurveName());
             KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGORITHM, "BC");
             keyPairGenerator.initialize(ecSpec, new SecureRandom());
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
-            return new EncryptionKeyPair(
-                    // X.509格式
-                    Base64.toBase64String(keyPair.getPublic().getEncoded()),
-                    // PKCS#8格式
-                    Base64.toBase64String(keyPair.getPrivate().getEncoded())
-            );
+            if (EncryptionKeyFormat.X509.getFormat().equals(options.getKeyFormat())) {
+                ContentSigner signer = new JcaContentSignerBuilder(getSignatureAlgorithmForCurve(curveType))
+                        .build(keyPair.getPrivate());
+                return new EncryptionKeyPair(
+                        CryptoUtils.publicKeyToX509PEM(options,
+                                SubjectPublicKeyInfo.getInstance(keyPair.getPublic().getEncoded()),
+                                signer),
+                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate()));
+            } else {
+                return new EncryptionKeyPair(
+                        CryptoUtils.publicKeyToPEM(keyPair.getPublic()),
+                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate())
+                );
+            }
         } catch (Exception ex) {
             throw new EncryptionException("Failed to generate key pair for ECIES encryption", ex);
         }
@@ -78,7 +90,7 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
             }
 
             // 1. Ensure to use non-compressed format
-            ECPublicKey receiverPubKey = (ECPublicKey) base64ToPublicKey(options.getReceiverKeyInfo().getPublicKey());
+            ECPublicKey receiverPubKey = (ECPublicKey) CryptoUtils.pemToPublicKey(options.getReceiverKeyInfo().getPublicKey());
 
             byte[] uncompressedPubKey = toUncompressedPoint(receiverPubKey);
             ECPublicKey normalizedKey = parseECPublicKey(uncompressedPubKey, curveType.getCurveName());
@@ -126,7 +138,7 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
                     extractNonceFromCiphertext(ciphertextData),
                     false
             );
-            cipher.init(Cipher.DECRYPT_MODE, base64ToPrivateKey(options.getReceiverKeyInfo().getPrivateKey()), params);
+            cipher.init(Cipher.DECRYPT_MODE, CryptoUtils.pemToPrivateKey(options.getReceiverKeyInfo().getPrivateKey()), params);
             String rawPayload = new String(cipher.doFinal(removeNonceFromCiphertext(ciphertextData)));
             options.setRawPayload(rawPayload);
             return rawPayload;
@@ -153,6 +165,18 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
         }
     }
 
+    private String getSignatureAlgorithmForCurve(CurveType curveType) {
+        switch (curveType) {
+            case SECP384R1:
+                return "SHA384withECDSA";
+            case SECP521R1:
+            case SECT571K1:
+                return "SHA512withECDSA";
+            default:
+                return "SHA256withECDSA";
+        }
+    }
+
     /**
      * Generate random nonce
      */
@@ -174,20 +198,6 @@ public abstract class EciesExecutor implements EncryptAndDecryptExecutor {
         ECPoint point = ecSpec.getCurve().decodePoint(uncompressedPoint);
         return (ECPublicKey) KeyFactory.getInstance("EC", "BC")
                 .generatePublic(new ECPublicKeySpec(point, ecSpec));
-    }
-
-    // Base64 to public key conversion
-    protected PublicKey base64ToPublicKey(String base64Key) throws Exception {
-        byte[] decoded = Base64.decode(base64Key);
-        KeyFactory kf = KeyFactory.getInstance("EC", "BC");
-        return kf.generatePublic(new X509EncodedKeySpec(decoded));
-    }
-
-    // Base64 to private key conversion
-    protected PrivateKey base64ToPrivateKey(String base64Key) throws Exception {
-        byte[] decoded = Base64.decode(base64Key);
-        KeyFactory kf = KeyFactory.getInstance("EC", "BC");
-        return kf.generatePrivate(new PKCS8EncodedKeySpec(decoded));
     }
 
     // Extract nonce from composite data

@@ -12,6 +12,7 @@ import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.sodium.LazySodium;
 import com.globaltravelrule.sodium.LazySodiumJava;
 import com.globaltravelrule.sodium.SodiumJava;
@@ -65,11 +66,13 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
     }
 
     @Override
-    public EncryptionKeyPair generateKeyPair() throws EncryptionException {
+    public EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
         try {
             Key seed = sodium.keygen(AEAD.Method.XCHACHA20_POLY1305_IETF);
             KeyPair keyPair = sodium.cryptoSignSeedKeypair(seed.getAsBytes());
-            return new EncryptionKeyPair(Base64.toBase64String(keyPair.getPublicKey().getAsBytes()), Base64.toBase64String(keyPair.getSecretKey().getAsBytes()));
+            return new EncryptionKeyPair(
+                    Base64.toBase64String(keyPair.getPublicKey().getAsBytes()),
+                    Base64.toBase64String(keyPair.getSecretKey().getAsBytes()));
         } catch (Exception ex) {
             throw new EncryptionException("Failed to generate ED25519 key pair", ex);
         }

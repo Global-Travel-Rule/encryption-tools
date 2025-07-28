@@ -10,11 +10,18 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.globaltravelrule.encryption.core.api.EncryptAndDecryptExecutor;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
+import com.globaltravelrule.encryption.core.enums.EncryptionKeyFormat;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.impl.bouncycastle.utils.CryptoUtils;
-import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -44,7 +51,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
     private static final int GCM_TAG_BIT_LENGTH = 128;
     private static final int GCM_IV_BIT_LENGTH = 128;
     private static final int AES_GCM_KEY_BIT_LENGTH = 256;
-    private static final int KEY_SIZE= 2048;
+    private static final int KEY_SIZE = 2048;
     private static final int PER_NONCE_SIZE = 8;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -55,16 +62,26 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
     }
 
     @Override
-    public EncryptionKeyPair generateKeyPair() throws EncryptionException {
+    public EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
         try {
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
             generator.initialize(KEY_SIZE);
             KeyPair keyPair = generator.generateKeyPair();
-            return new EncryptionKeyPair(
-                    Base64.toBase64String(keyPair.getPublic().getEncoded()),
-                    Base64.toBase64String(keyPair.getPrivate().getEncoded())
-            );
+            if (EncryptionKeyFormat.X509.getFormat().equals(options.getKeyFormat())) {
 
+                return new EncryptionKeyPair(
+                        CryptoUtils.publicKeyToX509PEM(options,
+                                SubjectPublicKeyInfo.getInstance(keyPair.getPublic()),
+                                new BcRSAContentSignerBuilder(
+                                        new AlgorithmIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption),
+                                        new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256)).build((RSAKeyParameters) keyPair.getPrivate())),
+                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate()));
+            } else {
+                return new EncryptionKeyPair(
+                        CryptoUtils.publicKeyToPEM(keyPair.getPublic()),
+                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate())
+                );
+            }
         } catch (Exception ex) {
             throw new EncryptionException("generate key RSA pair failed", ex);
         }
@@ -95,7 +112,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             algParams.init(new OAEPParameterSpec("SHA-1", "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT));
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
-            RSAPublicKey publicKey = CryptoUtils.parseRsaPublicKeyFromBase64(options.getReceiverKeyInfo().getPublicKey());
+            RSAPublicKey publicKey = (RSAPublicKey) CryptoUtils.pemToPublicKey(options.getReceiverKeyInfo().getPublicKey());
             rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey, algParams);
             byte[] encryptedAesKey = rsaCipher.doFinal(aesKeySpec.getEncoded());
 
@@ -135,7 +152,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             algParams.init(new OAEPParameterSpec("SHA-1", "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT));
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
-            RSAPrivateKey privateKey = CryptoUtils.parseRsaPrivateKeyFromBase64(options.getReceiverKeyInfo().getPrivateKey());
+            RSAPrivateKey privateKey = (RSAPrivateKey) CryptoUtils.pemToPrivateKey(options.getReceiverKeyInfo().getPrivateKey());
             rsaCipher.init(Cipher.DECRYPT_MODE, privateKey, algParams);
             byte[] decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
 
@@ -145,7 +162,7 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
             aesCipher.init(Cipher.DECRYPT_MODE, aesKeySpec, gcmParameterSpec);
             aesCipher.updateAAD(header.getBytes());
 
-            return new String(aesCipher.doFinal(CryptoUtils.concatArray(cipherText, gcmTag)),StandardCharsets.UTF_8);
+            return new String(aesCipher.doFinal(CryptoUtils.concatArray(cipherText, gcmTag)), StandardCharsets.UTF_8);
         } catch (Exception ex) {
             throw new EncryptionException("Failed to decrypt data by AES GCM with RSA OAEP using SHA-1 and MFG1 padding", ex);
         }

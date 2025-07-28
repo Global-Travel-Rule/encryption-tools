@@ -18,54 +18,34 @@ import java.io.Serializable;
  */
 public class EncryptionKeyPair implements Serializable {
 
-    // base64 public key
-    private String base64PublicKey;
+    // public key
+    private String publicKey;
 
-    // base64 private key
-    private String base64privateKey;
-
-    // random salt
-    private String salt;
+    // private key
+    private String privateKey;
 
     public EncryptionKeyPair() {
+
     }
 
-    public EncryptionKeyPair(String base64PublicKey, String base64privateKey, String salt) {
-        this.base64PublicKey = base64PublicKey;
-        this.base64privateKey = base64privateKey;
-        this.salt = salt;
+    public EncryptionKeyPair(String publicKey, String privateKey) {
+        this.publicKey = publicKey;
+        this.privateKey = privateKey;
     }
 
-    public EncryptionKeyPair(String base64PublicKey, String base64privateKey) {
-        this.base64PublicKey = base64PublicKey;
-        this.base64privateKey = base64privateKey;
+    public String getPublicKey() {
+        return publicKey;
     }
 
-    public EncryptionKeyPair(String salt) {
-        this.salt = salt;
+    public void setPublicKey(String publicKey) {
+        this.publicKey = publicKey;
     }
 
-    public String getBase64PublicKey() {
-        return base64PublicKey;
+    public String getPrivateKey() {
+        return privateKey;
     }
 
-    public void setBase64PublicKey(String base64PublicKey) {
-        this.base64PublicKey = base64PublicKey;
-    }
-
-    public String getBase64privateKey() {
-        return base64privateKey;
-    }
-
-    public void setBase64privateKey(String base64privateKey) {
-        this.base64privateKey = base64privateKey;
-    }
-
-    public String getSalt() {
-        return salt;
-    }
-
-    public void setSalt(String salt) {
-        this.salt = salt;
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 }

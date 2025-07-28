@@ -10,14 +10,16 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 import com.globaltravelrule.encryption.core.EncryptionUtils;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.enums.EncryptionFormat;
-import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
-import com.globaltravelrule.encryption.core.options.EncryptionParams;
-import com.globaltravelrule.encryption.core.options.KeyInfo;
-import com.globaltravelrule.encryption.core.options.PiiSecuredInfo;
+import com.globaltravelrule.encryption.core.enums.EncryptionKeyFormat;
+import com.globaltravelrule.encryption.core.options.*;
 import com.globaltravelrule.encryption.core.options.metadata.Keccak256Info;
 import org.bouncycastle.util.encoders.Base64;
 
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 
 public class BaseTest {
@@ -58,19 +60,30 @@ public class BaseTest {
 
         if (NORMAL_ALGORITHMS.contains(algorithm.getName())) {
             // 1. Generate key pair
-            EncryptionKeyPair aliceKp = EncryptionUtils.generateEncryptionKeyPair(algorithm.getName());
-            EncryptionKeyPair bobKp = EncryptionUtils.generateEncryptionKeyPair(algorithm.getName());
-            System.out.println("alice key pair: " + aliceKp.getBase64PublicKey() + ", " + aliceKp.getBase64privateKey());
-            System.out.println("bob key pair: " + bobKp.getBase64PublicKey() + ", " + bobKp.getBase64privateKey());
+            GenerateKeyPairOptions options = new GenerateKeyPairOptions(algorithm.getName());
+            options.setKeyFormat(EncryptionKeyFormat.X509.getFormat());
+            options.setSubjectDN("CN=Global Travel Rule,SERIALNUMBER=00001");
+            Date startDate = new Date();
+            Instant instant = startDate.toInstant();
+            LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+            LocalDateTime endDateTime = dateTime.plusYears(10);
+            Date endDate = Date.from(endDateTime.atZone(ZoneId.systemDefault()).toInstant());
+            options.setStartDate(startDate);
+            options.setEndDate(endDate);
 
-            piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
-            piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
+            EncryptionKeyPair aliceKp = EncryptionUtils.generateEncryptionKeyPair(options);
+            EncryptionKeyPair bobKp = EncryptionUtils.generateEncryptionKeyPair(options);
+            System.out.println("alice key pair: " + aliceKp.getPublicKey() + ", " + aliceKp.getPrivateKey());
+            System.out.println("bob key pair: " + bobKp.getPublicKey() + ", " + bobKp.getPrivateKey());
+
+            piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getPublicKey(), aliceKp.getPrivateKey()));
+            piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getPublicKey(), bobKp.getPrivateKey()));
             piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
             piiSecuredInfo.setSecuredPayload(null);
             doTestEncryptAndDecryptByDifferentMessageFormat(piiSecuredInfo, originalMessage);
 
-            piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
-            piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
+            piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getPublicKey(), aliceKp.getPrivateKey()));
+            piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getPublicKey(), bobKp.getPrivateKey()));
             piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.JSON_FIELD_ENCRYPT.getFormat());
             piiSecuredInfo.setSecuredPayload(null);
             doTestEncryptAndDecryptByDifferentMessageFormat(piiSecuredInfo, originalMessage);

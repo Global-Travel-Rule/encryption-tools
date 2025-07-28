@@ -12,29 +12,28 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Enum for Encryption Format
+ * Enum for Encryption Key Format
  *
  * @author Global Travel Rule developer
- * @version 1.0.0
- * @since 1.0.0
+ * @version 1.0.1
+ * @since 1.0.1
  */
-public enum EncryptionFormat {
+public enum EncryptionKeyFormat {
 
-    FULL_JSON_OBJECT_ENCRYPT("FULL_JSON_OBJECT_ENCRYPT", "full"),
-    JSON_FIELD_ENCRYPT("JSON_FIELD_ENCRYPT", "partial encrypt"),
-    JSON_FIELD_HASHED("JSON_FIELD_HASH", "partial hash");
+    DEFAULT("DEFAULT_FORMAT", "default"),
+    X509("X509_FORMAT", "x509");
 
-    private static final Map<String, EncryptionFormat> MAP;
+    private static final Map<String, EncryptionKeyFormat> MAP;
 
     static {
-        MAP = Arrays.stream(EncryptionFormat.values()).collect(Collectors.toMap(EncryptionFormat::getFormat, format -> format));
+        MAP = Arrays.stream(EncryptionKeyFormat.values()).collect(Collectors.toMap(EncryptionKeyFormat::getFormat, format -> format));
     }
 
     private final String format;
 
     private final String description;
 
-    EncryptionFormat(String name, String description) {
+    EncryptionKeyFormat(String name, String description) {
         this.format = name;
         this.description = description;
     }
@@ -47,7 +46,7 @@ public enum EncryptionFormat {
         return description;
     }
 
-    public static EncryptionFormat parse(String algorithmType) {
+    public static EncryptionKeyFormat parse(String algorithmType) {
         return MAP.get(algorithmType);
     }
 }

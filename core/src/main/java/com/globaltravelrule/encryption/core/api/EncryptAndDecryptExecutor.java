@@ -11,6 +11,7 @@ import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 
 /**
  * Encrypt and decrypt algorithm method.
@@ -34,7 +35,7 @@ public interface EncryptAndDecryptExecutor {
      * @return the key pair
      * @throws EncryptionException if an error occurs during key pair generation
      */
-    default EncryptionKeyPair generateKeyPair() throws EncryptionException {
+    default EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
         throw new EncryptionException("Not supported");
     }
 
