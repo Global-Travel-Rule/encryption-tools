@@ -18,15 +18,15 @@ import java.io.Serializable;
  */
 public class EncryptionKeyPair implements Serializable {
 
-    // public key
+    // base64 public key
     private String publicKey;
 
-    // private key
+    // base64 private key
     private String privateKey;
 
     public EncryptionKeyPair() {
-
     }
+
 
     public EncryptionKeyPair(String publicKey, String privateKey) {
         this.publicKey = publicKey;

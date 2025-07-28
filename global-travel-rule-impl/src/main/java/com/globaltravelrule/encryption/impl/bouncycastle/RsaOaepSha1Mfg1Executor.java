@@ -20,7 +20,11 @@ import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
+import org.bouncycastle.crypto.params.RSAKeyGenerationParameters;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 
 import javax.crypto.Cipher;
@@ -28,13 +32,14 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.security.AlgorithmParameters;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
+import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.RSAPrivateCrtKeySpec;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -64,27 +69,71 @@ public class RsaOaepSha1Mfg1Executor implements EncryptAndDecryptExecutor {
     @Override
     public EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
         try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-            generator.initialize(KEY_SIZE);
-            KeyPair keyPair = generator.generateKeyPair();
+            BigInteger publicExponent = BigInteger.valueOf(65537);
+            SecureRandom random = new SecureRandom();
+            RSAKeyPairGenerator generator = new RSAKeyPairGenerator();
+            generator.init(new RSAKeyGenerationParameters(
+                    publicExponent,
+                    random,
+                    KEY_SIZE,
+                    80
+            ));
+            AsymmetricCipherKeyPair keyPair = generator.generateKeyPair();
             if (EncryptionKeyFormat.X509.getFormat().equals(options.getKeyFormat())) {
+                // Convert to SubjectPublicKeyInfo
+                RSAKeyParameters publicKey = (RSAKeyParameters) keyPair.getPublic();
+                SubjectPublicKeyInfo subjectPublicKeyInfo = new SubjectPublicKeyInfo(new AlgorithmIdentifier(
+                        PKCSObjectIdentifiers.rsaEncryption,
+                        org.bouncycastle.asn1.DERNull.INSTANCE
+                ), new org.bouncycastle.asn1.pkcs.RSAPublicKey(publicKey.getModulus(), publicKey.getExponent()));
 
+                RSAPrivateCrtKeyParameters bcPrivateKey = (RSAPrivateCrtKeyParameters) keyPair.getPrivate();
                 return new EncryptionKeyPair(
                         CryptoUtils.publicKeyToX509PEM(options,
-                                SubjectPublicKeyInfo.getInstance(keyPair.getPublic()),
+                                subjectPublicKeyInfo,
                                 new BcRSAContentSignerBuilder(
                                         new AlgorithmIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption),
-                                        new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256)).build((RSAKeyParameters) keyPair.getPrivate())),
-                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate()));
+                                        new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256)).build(bcPrivateKey)),
+                        CryptoUtils.privateKeyToPEM(convertToPrivateKey((RSAPrivateCrtKeyParameters) keyPair.getPrivate())));
             } else {
                 return new EncryptionKeyPair(
-                        CryptoUtils.publicKeyToPEM(keyPair.getPublic()),
-                        CryptoUtils.privateKeyToPEM(keyPair.getPrivate())
+                        CryptoUtils.publicKeyToPEM(convertToPublicKey((RSAKeyParameters) keyPair.getPublic())),
+                        CryptoUtils.privateKeyToPEM(convertToPrivateKey((RSAPrivateCrtKeyParameters) keyPair.getPrivate()))
                 );
             }
         } catch (Exception ex) {
             throw new EncryptionException("generate key RSA pair failed", ex);
         }
+    }
+
+    public static PublicKey convertToPublicKey(RSAKeyParameters publicKey) throws Exception {
+        if (publicKey.isPrivate()) {
+            throw new IllegalArgumentException("The RSAKeyParameters provided are not public keys");
+        }
+        RSAPublicKeySpec keySpec = new RSAPublicKeySpec(
+                publicKey.getModulus(),
+                publicKey.getExponent()
+        );
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePublic(keySpec);
+    }
+
+    private PrivateKey convertToPrivateKey(RSAPrivateCrtKeyParameters bcPrivateKey) throws Exception {
+        // 1. Create RSA Private Key Specification
+        RSAPrivateCrtKeySpec keySpec = new RSAPrivateCrtKeySpec(
+                bcPrivateKey.getModulus(),           // n
+                bcPrivateKey.getPublicExponent(),    // e
+                bcPrivateKey.getExponent(),          // d
+                bcPrivateKey.getP(),                 // p
+                bcPrivateKey.getQ(),                 // q
+                bcPrivateKey.getDP(),                // dP
+                bcPrivateKey.getDQ(),                // dQ
+                bcPrivateKey.getQInv()               // qInv
+        );
+
+        // 2. Use KeyFactory for conversion
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePrivate(keySpec);
     }
 
     @Override
