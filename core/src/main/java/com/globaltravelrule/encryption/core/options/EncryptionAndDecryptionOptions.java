@@ -24,12 +24,12 @@ public class EncryptionAndDecryptionOptions {
     /**
      * @see com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm
      */
-    private String secretAlgorithm;
+    private String algorithmType;
 
     /**
      * @see com.globaltravelrule.encryption.core.enums.EncryptionFormat
      */
-    private String piiSecretFormatType;
+    private String encryptionFormatType;
 
     private EncryptionParams encryptionParams;
 
@@ -41,11 +41,11 @@ public class EncryptionAndDecryptionOptions {
 
     }
 
-    public EncryptionAndDecryptionOptions(KeyInfo initiatorKeyInfo, KeyInfo receiverKeyInfo, String secretAlgorithm, String piiSecretFormatType) {
+    public EncryptionAndDecryptionOptions(KeyInfo initiatorKeyInfo, KeyInfo receiverKeyInfo, String algorithmType, String encryptionFormatType) {
         this.initiatorKeyInfo = initiatorKeyInfo;
         this.receiverKeyInfo = receiverKeyInfo;
-        this.secretAlgorithm = secretAlgorithm;
-        this.piiSecretFormatType = piiSecretFormatType;
+        this.algorithmType = algorithmType;
+        this.encryptionFormatType = encryptionFormatType;
     }
 
     public static EncryptionAndDecryptionOptions withPiiSecuredInfo(PiiSecuredInfo piiSecuredInfo) {
@@ -69,12 +69,12 @@ public class EncryptionAndDecryptionOptions {
     }
 
 
-    public String getSecretAlgorithm() {
-        return secretAlgorithm;
+    public String getAlgorithmType() {
+        return algorithmType;
     }
 
-    public String getPiiSecretFormatType() {
-        return piiSecretFormatType;
+    public String getEncryptionFormatType() {
+        return encryptionFormatType;
     }
 
     public EncryptionParams getEncryptionParams() {

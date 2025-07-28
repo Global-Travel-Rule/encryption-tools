@@ -7,23 +7,31 @@
 
 package com.globaltravelrule.encryption.impl.bouncycastle.utils;
 
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters;
+import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
-import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.security.KeyFactory;
+import java.math.BigInteger;
 import java.security.PrivateKey;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.PublicKey;
+import java.util.Date;
 
 /**
  * crypto utils
@@ -33,6 +41,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
  * @since 1.0.0
  */
 public class CryptoUtils {
+
+    private static final Logger log = LoggerFactory.getLogger(CryptoUtils.class);
 
     // Convert Ed25519 public key to Curve25519 public key
     public static X25519PublicKeyParameters convertEd25519ToCurve25519(Ed25519PublicKeyParameters edPublicKey) {
@@ -54,49 +64,8 @@ public class CryptoUtils {
         return new X25519PublicKeyParameters(xPub);
     }
 
-    /**
-     * Create RSA public key from Base64 format string
-     *
-     * @param base64PublicKey Base64 encoded public key
-     * @return RSAKeyParameters
-     * @throws IOException If parsing fails
-     */
-    public static RSAPublicKey parseRsaPublicKeyFromBase64(String base64PublicKey) throws Exception {
-        byte[] keyBytes = Base64.decode(base64PublicKey);
-        SubjectPublicKeyInfo keyInfo = SubjectPublicKeyInfo.getInstance(keyBytes);
-        return (RSAPublicKey) new JcaPEMKeyConverter().getPublicKey(keyInfo);
-    }
-
-    /**
-     * Create RSA private key from Base64 format string
-     *
-     * @param base64PrivateKey PEM format private key base64 string
-     * @return PrivateKey
-     * @throws IOException If parsing fails
-     */
-    public static RSAPrivateKey parseRsaPrivateKeyFromBase64(String base64PrivateKey) throws Exception {
-        byte[] keyBytes = Base64.decode(base64PrivateKey);
-        PrivateKeyInfo keyInfo = PrivateKeyInfo.getInstance(keyBytes);
-        return (RSAPrivateKey) new JcaPEMKeyConverter().getPrivateKey(keyInfo);
-    }
-
-    /**
-     * Convert Bouncy Castle private key to standard RSAPrivateKey
-     *
-     * @param bcPrivateKey Bouncy Castle Private Key
-     * @return RSAPrivateKey
-     * @throws Exception If parsing fails
-     */
-    public static RSAPrivateKey toRSAPrivateKey(PrivateKey bcPrivateKey) throws Exception {
-        if (bcPrivateKey instanceof RSAPrivateKey) {
-            return (RSAPrivateKey) bcPrivateKey;
-        }
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return (RSAPrivateKey) keyFactory.generatePrivate(new PKCS8EncodedKeySpec(bcPrivateKey.getEncoded()));
-    }
-
-    // RSAPublicKey to PEM format
-    public static String rsaPublicKeyToPEM(RSAPublicKey publicKey) throws Exception {
+    // PublicKey to PEM format
+    public static String publicKeyToPEM(PublicKey publicKey) throws Exception {
         StringWriter writer = new StringWriter();
         try (JcaPEMWriter pemWriter = new JcaPEMWriter(writer)) {
             pemWriter.writeObject(publicKey);
@@ -104,8 +73,8 @@ public class CryptoUtils {
         return writer.toString();
     }
 
-    // RSAPrivateKey to PEM format
-    public static String rsaPrivateKeyToPEM(RSAPrivateKey privateKey) throws Exception {
+    // PrivateKey to PEM format
+    public static String privateKeyToPEM(PrivateKey privateKey) throws Exception {
         StringWriter writer = new StringWriter();
         try (JcaPEMWriter pemWriter = new JcaPEMWriter(writer)) {
             pemWriter.writeObject(privateKey);
@@ -113,19 +82,71 @@ public class CryptoUtils {
         return writer.toString();
     }
 
-    // PEM to RSAPublicKey
-    public static RSAPublicKey pemToRSAPublicKey(String pemPublicKey) throws Exception {
+    // PEM to PublicKey
+    public static PublicKey pemToPublicKey(String pemPublicKey) throws Exception {
         try (PEMParser pemParser = new PEMParser(new StringReader(pemPublicKey))) {
-            SubjectPublicKeyInfo keyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
-            return (RSAPublicKey) new JcaPEMKeyConverter().getPublicKey(keyInfo);
+            Object obj = pemParser.readObject();
+            if (obj instanceof X509CertificateHolder) {
+                X509CertificateHolder certHolder = (X509CertificateHolder) obj;
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+                return converter.getPublicKey(certHolder.getSubjectPublicKeyInfo());
+            } else if (obj instanceof SubjectPublicKeyInfo) {
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+                return converter.getPublicKey((SubjectPublicKeyInfo) obj);
+            } else {
+                throw new IllegalArgumentException("Unsupported PEM format: " + obj.getClass());
+            }
         }
     }
 
-    // PEM to RSAPrivateKey
-    public static RSAPrivateKey pemToRSAPrivateKey(String pemPrivateKey) throws Exception {
+    // PEM to PrivateKey
+    public static PrivateKey pemToPrivateKey(String pemPrivateKey) throws Exception {
         try (PEMParser pemParser = new PEMParser(new StringReader(pemPrivateKey))) {
-            PrivateKeyInfo keyInfo = (PrivateKeyInfo) pemParser.readObject();
-            return (RSAPrivateKey) new JcaPEMKeyConverter().getPrivateKey(keyInfo);
+            Object obj = pemParser.readObject();
+            if (obj instanceof PEMKeyPair) {
+                return new JcaPEMKeyConverter().getPrivateKey(((PEMKeyPair) obj).getPrivateKeyInfo());
+            } else if (obj instanceof PrivateKeyInfo) {
+                return new JcaPEMKeyConverter().getPrivateKey((PrivateKeyInfo) obj);
+            } else {
+                throw new IllegalArgumentException("Unsupported PEM format: " + obj.getClass());
+            }
+        }
+    }
+
+    // Retrieve the X509 format public key certificate string (PEM)
+    public static String publicKeyToX509PEM(GenerateKeyPairOptions options,
+                                            SubjectPublicKeyInfo publicKeyInfo,
+                                            ContentSigner signer) throws Exception {
+        X509CertificateHolder certificate;
+        X500Name issuer = new X500Name(options.getSubjectDN());
+        Date startDate = options.getStartDate();
+        if (startDate == null) {
+            startDate = new Date();
+        }
+        Date endDate = options.getEndDate();
+        if (endDate == null) {
+            endDate = new Date(startDate.getTime() + 365L * 24 * 60 * 60 * 1000);
+        }
+
+        X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(
+                issuer,
+                BigInteger.valueOf(System.currentTimeMillis()),
+                startDate,
+                endDate,
+                issuer,
+                publicKeyInfo);
+        certificate = certBuilder.build(signer);
+        try (StringWriter writer = new StringWriter()) {
+            try (PemWriter pemWriter = new PemWriter(writer)) {
+                pemWriter.writeObject(new PemObject("CERTIFICATE", certificate.getEncoded()));
+            } catch (Exception ex) {
+                log.error("generate PEM string error", ex);
+                throw ex;
+            }
+            return writer.toString();
+        } catch (Exception ex) {
+            log.error("generate PEM string error", ex);
+            throw new OperatorCreationException("generate PEM string error", ex);
         }
     }
 

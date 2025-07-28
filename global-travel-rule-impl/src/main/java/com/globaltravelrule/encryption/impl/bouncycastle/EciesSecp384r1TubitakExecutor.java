@@ -9,8 +9,12 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
+import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
 import com.globaltravelrule.encryption.core.options.EncryptionParams;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.core.options.metadata.ECIESInfo;
+import com.globaltravelrule.encryption.impl.bouncycastle.enums.CurveType;
+import com.globaltravelrule.encryption.impl.bouncycastle.utils.CryptoUtils;
 import org.bouncycastle.util.encoders.Base64;
 
 import javax.crypto.Cipher;
@@ -44,6 +48,11 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
     }
 
     @Override
+    public EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
+        return doGenerateKeyPair(options, CurveType.SECP384R1);
+    }
+
+    @Override
     public String encrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
         try {
             if (options.getRawPayload() == null || options.getRawPayload().isEmpty()) {
@@ -54,8 +63,8 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
             kpg.initialize(ecSpec);
 
-            PublicKey recipientPublicKey = base64ToPublicKey(options.getReceiverKeyInfo().getPublicKey());
-            PrivateKey senderPrivateKey = base64ToPrivateKey(options.getInitiatorKeyInfo().getPrivateKey());
+            PublicKey recipientPublicKey = CryptoUtils.pemToPublicKey(options.getReceiverKeyInfo().getPublicKey());
+            PrivateKey senderPrivateKey = CryptoUtils.pemToPrivateKey(options.getInitiatorKeyInfo().getPrivateKey());
 
             // Generate ephemeral key pair
             KeyPair ephemeralKP = kpg.generateKeyPair();
@@ -114,8 +123,8 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
                 throw new EncryptionException("Failed to decrypt data by ECIES SECP384R1 TUBITAK, encryption params nil");
             }
 
-            PrivateKey recipientPrivateKey = base64ToPrivateKey(options.getReceiverKeyInfo().getPrivateKey());
-            PublicKey senderPublicKey = base64ToPublicKey(options.getInitiatorKeyInfo().getPublicKey());
+            PrivateKey recipientPrivateKey = CryptoUtils.pemToPrivateKey(options.getReceiverKeyInfo().getPrivateKey());
+            PublicKey senderPublicKey = CryptoUtils.pemToPublicKey(options.getInitiatorKeyInfo().getPublicKey());
 
             // Deserialize ephemeral public key
             ECPublicKey ephemeralPub = getShardPublicKey(options.getEncryptionParams().getEcies().getEphemeralPublicKey());

@@ -87,31 +87,50 @@ implementation 'com.globaltravelrule.encryption:global-travel-rule-impl:{LATEST_
 #### Basic com.globaltravelrule.encryption.Example
 
 ```java
+import com.globaltravelrule.encryption.core.EncryptionUtils;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.enums.EncryptionFormat;
+import com.globaltravelrule.encryption.core.enums.EncryptionKeyFormat;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.core.options.KeyInfo;
 import com.globaltravelrule.encryption.core.options.PiiSecuredInfo;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 
 public class Example {
 
     public static void main(String[] args) {
         // Initialize key pair
-        EncryptionKeyPair aliceKp = EncryptionUtils.generateEncryptionKeyPair(EncryptionAlgorithm.ED25519_CURVE25519.getName());
-        EncryptionKeyPair bobKp = EncryptionUtils.generateEncryptionKeyPair(EncryptionAlgorithm.ED25519_CURVE25519.getName());
-        System.out.println("alice key pair: " + aliceKp.getBase64PublicKey() + ", " + aliceKp.getBase64privateKey());
-        System.out.println("bob key pair: " + bobKp.getBase64PublicKey() + ", " + bobKp.getBase64privateKey());
+        GenerateKeyPairOptions options = new GenerateKeyPairOptions(EncryptionAlgorithm.ECIES_SECP384R1.getName());
+        options.setKeyFormat(EncryptionKeyFormat.X509.getFormat());
+        options.setSubjectDN("CN=Global Travel Rule,SERIALNUMBER=00001");
+        Date startDate = new Date();
+        Instant instant = startDate.toInstant();
+        LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        LocalDateTime endDateTime = dateTime.plusYears(10);
+        Date endDate = Date.from(endDateTime.atZone(ZoneId.systemDefault()).toInstant());
+        options.setStartDate(startDate);
+        options.setEndDate(endDate);
+
+        EncryptionKeyPair aliceKp = EncryptionUtils.generateEncryptionKeyPair(options);
+        EncryptionKeyPair bobKp = EncryptionUtils.generateEncryptionKeyPair(options);
+        System.out.println("alice key pair: " + aliceKp.getPublicKey() + ", " + aliceKp.getPrivateKey());
+        System.out.println("bob key pair: " + bobKp.getPublicKey() + ", " + bobKp.getPrivateKey());
 
         String originalMessage = "{\"test_num1\":0,\"test_num2\":1.01,\"test_bool\":true,\"test_string\":\"testing\",\"testing_object\":{\"testing_object_num1\":0,\"testing_object_num2\":1.01,\"testing_object_bool\":true,\"testing_object_string\":\"testing\"}}";
         System.out.println("raw message: " + originalMessage);
 
         PiiSecuredInfo piiSecuredInfo = new PiiSecuredInfo();
-        piiSecuredInfo.setSecretAlgorithm(EncryptionAlgorithm.ED25519_CURVE25519.getName());
+        piiSecuredInfo.setSecretAlgorithm(EncryptionAlgorithm.ECIES_SECP384R1.getName());
         piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
 
         // encrypt message
-        piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getBase64PublicKey(), aliceKp.getBase64privateKey()));
-        piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getBase64PublicKey(), bobKp.getBase64privateKey()));
+        piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getPublicKey(), aliceKp.getPrivateKey()));
+        piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getPublicKey(), bobKp.getPrivateKey()));
         piiSecuredInfo.setSecuredPayload(null);
 
         String encryptedMessage = EncryptionUtils.encrypt(piiSecuredInfo, originalMessage).getSecuredPayload();
@@ -165,7 +184,7 @@ public class Example {
 
 ### License
 
-MIT License - See [LICENSE](LICENSE) for details.
+MPL License - See [LICENSE](LICENSE) for details.
 
 ### Support
 

@@ -16,6 +16,7 @@ import com.globaltravelrule.encryption.core.enums.EncryptionFormat;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.core.options.PiiSecuredInfo;
 
 import java.util.HashMap;
@@ -79,13 +80,16 @@ public class EncryptionUtils {
     /**
      * Generate a key pair for the specified algorithm.
      *
-     * @param algorithmType the encryption algorithm type
+     * @param options generating options
      * @return the key pair
      * @throws EncryptionException if the algorithm is not supported or other encryption-related errors occur
      */
-    private EncryptionKeyPair doGenerateKeyPair(String algorithmType) {
-        EncryptAndDecryptExecutor executor = getCryptionExecutor(algorithmType);
-        return executor.generateKeyPair();
+    private EncryptionKeyPair doGenerateKeyPair(GenerateKeyPairOptions options) {
+        if (options.getAlgorithmType() == null) {
+            throw new EncryptionException("encryption algorithm invalid");
+        }
+        EncryptAndDecryptExecutor executor = getCryptionExecutor(options.getAlgorithmType());
+        return executor.generateKeyPair(options);
     }
 
     /**
@@ -95,9 +99,9 @@ public class EncryptionUtils {
      * @param options the encryption or decryption info
      */
     private void doEncryptAndDecrypt(EncryptionAndDecryptionOptions options, String action) {
-        EncryptAndDecryptExecutor executor = getCryptionExecutor(options.getSecretAlgorithm());
+        EncryptAndDecryptExecutor executor = getCryptionExecutor(options.getAlgorithmType());
         String payload;
-        EncryptionFormat format = EncryptionFormat.parse(options.getPiiSecretFormatType());
+        EncryptionFormat format = EncryptionFormat.parse(options.getEncryptionFormatType());
         switch (format) {
             case FULL_JSON_OBJECT_ENCRYPT:
                 payload = encryptAndDecryptString(executor, options, action);
@@ -107,7 +111,7 @@ public class EncryptionUtils {
                 payload = encryptAndDecryptJsonData(executor, options, action);
                 break;
             default:
-                throw new EncryptionException("Unsupported PII Secret Format Type: " + options.getPiiSecretFormatType());
+                throw new EncryptionException("Unsupported PII Secret Format Type: " + options.getEncryptionFormatType());
         }
         processPiiSecuredInfo(payload, options, action);
     }
@@ -312,11 +316,11 @@ public class EncryptionUtils {
     /**
      * generate a key pair for encryption and decryption
      *
-     * @param algorithmType the type of the algorithm to use for encryption and decryption
+     * @param options the options of the algorithm to use for encryption and decryption
      * @return the key pair
      */
-    public static EncryptionKeyPair generateEncryptionKeyPair(String algorithmType) {
-        return EncryptionUtils.getInstance().doGenerateKeyPair(algorithmType);
+    public static EncryptionKeyPair generateEncryptionKeyPair(GenerateKeyPairOptions options) {
+        return EncryptionUtils.getInstance().doGenerateKeyPair(options);
     }
 
     /**
@@ -332,8 +336,8 @@ public class EncryptionUtils {
 
         piiSecuredInfo.setInitiatorKeyInfo(options.getInitiatorKeyInfo());
         piiSecuredInfo.setReceiverKeyInfo(options.getReceiverKeyInfo());
-        piiSecuredInfo.setSecretAlgorithm(options.getSecretAlgorithm());
-        piiSecuredInfo.setPiiSecretFormatType(options.getPiiSecretFormatType());
+        piiSecuredInfo.setSecretAlgorithm(options.getAlgorithmType());
+        piiSecuredInfo.setPiiSecretFormatType(options.getEncryptionFormatType());
         piiSecuredInfo.setSecuredPayload(options.getSecuredPayload());
         return piiSecuredInfo;
     }
@@ -351,8 +355,8 @@ public class EncryptionUtils {
 
         piiSecuredInfo.setInitiatorKeyInfo(options.getInitiatorKeyInfo());
         piiSecuredInfo.setReceiverKeyInfo(options.getReceiverKeyInfo());
-        piiSecuredInfo.setSecretAlgorithm(options.getSecretAlgorithm());
-        piiSecuredInfo.setPiiSecretFormatType(options.getPiiSecretFormatType());
+        piiSecuredInfo.setSecretAlgorithm(options.getAlgorithmType());
+        piiSecuredInfo.setPiiSecretFormatType(options.getEncryptionFormatType());
         piiSecuredInfo.setSecuredPayload(options.getSecuredPayload());
         return options.getRawPayload();
     }

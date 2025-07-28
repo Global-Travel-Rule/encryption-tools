@@ -11,6 +11,7 @@ import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import com.globaltravelrule.encryption.core.exceptions.EncryptionException;
 import com.globaltravelrule.encryption.core.options.EncryptionAndDecryptionOptions;
 import com.globaltravelrule.encryption.core.options.EncryptionKeyPair;
+import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
 import com.globaltravelrule.encryption.impl.bouncycastle.enums.CurveType;
 
 /**
@@ -28,8 +29,8 @@ public class EciesSect571k1Executor extends EciesExecutor {
     }
 
     @Override
-    public EncryptionKeyPair generateKeyPair() throws EncryptionException {
-        return doGenerateKeyPair(CurveType.SECT571K1);
+    public EncryptionKeyPair generateKeyPair(GenerateKeyPairOptions options) throws EncryptionException {
+        return doGenerateKeyPair(options, CurveType.SECT571K1);
     }
 
     @Override
