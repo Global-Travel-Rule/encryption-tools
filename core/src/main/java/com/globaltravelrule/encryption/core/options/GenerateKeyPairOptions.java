@@ -30,12 +30,12 @@ public class GenerateKeyPairOptions {
 
     /**
      * default current time
-     */
+     * */
     private Date startDate;
 
     /**
      * default current time and one year
-     */
+     * */
     private Date endDate;
 
     public GenerateKeyPairOptions() {
