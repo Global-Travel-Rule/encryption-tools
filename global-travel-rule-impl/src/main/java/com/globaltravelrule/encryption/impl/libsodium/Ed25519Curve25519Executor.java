@@ -20,6 +20,7 @@ import com.globaltravelrule.sodium.exceptions.SodiumException;
 import com.globaltravelrule.sodium.interfaces.AEAD;
 import com.globaltravelrule.sodium.interfaces.Box;
 import com.globaltravelrule.sodium.interfaces.MessageEncoder;
+import com.globaltravelrule.sodium.interfaces.Sign;
 import com.globaltravelrule.sodium.utils.Key;
 import com.globaltravelrule.sodium.utils.KeyPair;
 import com.globaltravelrule.sodium.utils.LibraryLoader;
@@ -93,7 +94,7 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
                 throw new SodiumException("Could not encrypt data");
             }
 
-            //拼接 nonce
+            //Splicing Nonce
             byte[] encryptedFullData = new byte[nonce.length + encryptedData.length];
             System.arraycopy(nonce, 0, encryptedFullData, 0, nonce.length);
             System.arraycopy(encryptedData, 0, encryptedFullData, nonce.length, encryptedData.length);
@@ -112,10 +113,12 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
             if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
                 return options.getSecuredPayload();
             }
+            byte[] secretKeyBytes = Arrays.copyOfRange(
+                    Base64.decode(options.getReceiverKeyInfo().getPrivateKey()), 0, Sign.CURVE25519_SECRETKEYBYTES);
+            String processPrivateKey = Base64.toBase64String(secretKeyBytes);
+            byte[] secretKey = generateSecretKey(options.getInitiatorKeyInfo().getPublicKey(), processPrivateKey);
 
-            byte[] secretKey = generateSecretKey(options.getInitiatorKeyInfo().getPublicKey(), options.getReceiverKeyInfo().getPrivateKey());
-
-            // 分离nonce和密文
+            // Compatible with separating nonce and ciphertext
             byte[] fullCiphertextData = Base64.decode(options.getSecuredPayload());
             byte[] nonce = java.util.Arrays.copyOfRange(fullCiphertextData, 0, Box.NONCEBYTES);
             byte[] ciphertextData = Arrays.copyOfRange(fullCiphertextData, Box.NONCEBYTES, fullCiphertextData.length);
@@ -133,8 +136,13 @@ public class Ed25519Curve25519Executor implements EncryptAndDecryptExecutor {
         }
     }
 
-    private byte[] generateSecretKey(String base64RemotePublicKey, String base64HostedPrivateKey) throws SodiumException {
-        KeyPair curve25519KeyPair = sodium.convertKeyPairEd25519ToCurve25519(new KeyPair(Key.fromBase64String(base64RemotePublicKey), Key.fromBase64String(base64HostedPrivateKey)));
-        return sodium.cryptoBoxBeforeNm(curve25519KeyPair).getBytes(StandardCharsets.UTF_8);
+    private byte[] generateSecretKey(String base64RemotePublicKey, String base64HostedPrivateKey) {
+        byte[] sharedKey = new byte[Box.BEFORENMBYTES];
+        byte[] curPublicKey = new byte[Sign.CURVE25519_PUBLICKEYBYTES];
+        byte[] curPrivateKey = new byte[Sign.CURVE25519_SECRETKEYBYTES];
+        sodium.convertPublicKeyEd25519ToCurve25519(curPublicKey, Base64.decode(base64RemotePublicKey.getBytes(StandardCharsets.UTF_8)));
+        sodium.convertSecretKeyEd25519ToCurve25519(curPrivateKey, Base64.decode(base64HostedPrivateKey.getBytes(StandardCharsets.UTF_8)));
+        sodium.cryptoBoxBeforeNm(sharedKey, curPublicKey, curPrivateKey);
+        return sharedKey;
     }
 }
