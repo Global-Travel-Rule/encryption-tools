@@ -10,7 +10,7 @@ package com.globaltravelrule.encryption.impl.bouncycastle;
 import com.globaltravelrule.encryption.core.enums.EncryptionAlgorithm;
 import org.junit.Test;
 
-public class EciesTest extends BaseTest{
+public class EciesTest extends BaseTest {
 
     @Test
     public void testEncryptAndDecrypt() {

@@ -1,6 +1,8 @@
 package com.globaltravelrule.encryption.core.options.metadata;
 
 
+import java.security.KeyPair;
+
 /**
  * ECIES Algorithm Meta Info
  *
@@ -11,6 +13,13 @@ package com.globaltravelrule.encryption.core.options.metadata;
 public class ECIESInfo {
 
     /**
+     * Used for caching dynamic key context during encryption process,
+     * corresponding to recursive field scenarios, using a unified temporary keypair
+     *
+     */
+    private KeyPair ephemeralKP;
+
+    /**
      * base64 format key string
      */
     private String ephemeralPublicKey;
@@ -18,8 +27,25 @@ public class ECIESInfo {
     public ECIESInfo() {
     }
 
+    public ECIESInfo(KeyPair ephemeralKP) {
+        this.ephemeralKP = ephemeralKP;
+    }
+
     public ECIESInfo(String ephemeralPublicKey) {
         this.ephemeralPublicKey = ephemeralPublicKey;
+    }
+
+    public ECIESInfo(KeyPair ephemeralKP, String ephemeralPublicKey) {
+        this.ephemeralKP = ephemeralKP;
+        this.ephemeralPublicKey = ephemeralPublicKey;
+    }
+
+    public KeyPair getEphemeralKP() {
+        return ephemeralKP;
+    }
+
+    public void setEphemeralKP(KeyPair ephemeralKP) {
+        this.ephemeralKP = ephemeralKP;
     }
 
     public String getEphemeralPublicKey() {
