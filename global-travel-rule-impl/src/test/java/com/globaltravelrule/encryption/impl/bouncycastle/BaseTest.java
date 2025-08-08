@@ -33,7 +33,8 @@ public class BaseTest {
             EncryptionAlgorithm.ECIES_SECP384R1.getName(),
             EncryptionAlgorithm.ECIES_SECP521R1.getName(),
             EncryptionAlgorithm.ECIES_SECP256K1.getName(),
-            EncryptionAlgorithm.ECIES_SECT571K1.getName());
+            EncryptionAlgorithm.ECIES_SECT571K1.getName(),
+            EncryptionAlgorithm.ECIES_SECP384R1_TUBITAK.getName());
 
     public void doTestEncryptAndDecrypt(EncryptionAlgorithm algorithm) {
         System.out.println("------ start encrypt and decrypt for:" + algorithm.getName());
@@ -79,12 +80,14 @@ public class BaseTest {
             piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getPublicKey(), aliceKp.getPrivateKey()));
             piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getPublicKey(), bobKp.getPrivateKey()));
             piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.FULL_JSON_OBJECT_ENCRYPT.getFormat());
+            piiSecuredInfo.setEncryptionParams(null);
             piiSecuredInfo.setSecuredPayload(null);
             doTestEncryptAndDecryptByDifferentMessageFormat(piiSecuredInfo, originalMessage);
 
             piiSecuredInfo.setInitiatorKeyInfo(new KeyInfo(aliceKp.getPublicKey(), aliceKp.getPrivateKey()));
             piiSecuredInfo.setReceiverKeyInfo(new KeyInfo(bobKp.getPublicKey(), bobKp.getPrivateKey()));
             piiSecuredInfo.setPiiSecretFormatType(EncryptionFormat.JSON_FIELD_ENCRYPT.getFormat());
+            piiSecuredInfo.setEncryptionParams(null);
             piiSecuredInfo.setSecuredPayload(null);
             doTestEncryptAndDecryptByDifferentMessageFormat(piiSecuredInfo, originalMessage);
         }

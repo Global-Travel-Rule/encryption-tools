@@ -241,8 +241,8 @@ public class EncryptionUtils {
 
         if (DECRYPTION_ACTION.equals(action)) {
             options.setSecuredPayload(jsonNode.asText());
-            String metadataStr = executor.decrypt(options);
             try {
+                String metadataStr = executor.decrypt(options);
                 var metadata = objectMapper.readValue(metadataStr, Map.class);
                 String type = String.valueOf(metadata.get("type"));
                 String valueStr = String.valueOf(metadata.get("value"));
@@ -338,6 +338,7 @@ public class EncryptionUtils {
         piiSecuredInfo.setReceiverKeyInfo(options.getReceiverKeyInfo());
         piiSecuredInfo.setSecretAlgorithm(options.getAlgorithmType());
         piiSecuredInfo.setPiiSecretFormatType(options.getEncryptionFormatType());
+        piiSecuredInfo.setEncryptionParams(options.getEncryptionParams());
         piiSecuredInfo.setSecuredPayload(options.getSecuredPayload());
         return piiSecuredInfo;
     }

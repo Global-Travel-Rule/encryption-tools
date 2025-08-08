@@ -66,11 +66,24 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
             PublicKey recipientPublicKey = CryptoUtils.pemToPublicKey(options.getReceiverKeyInfo().getPublicKey());
             PrivateKey senderPrivateKey = CryptoUtils.pemToPrivateKey(options.getInitiatorKeyInfo().getPrivateKey());
 
-            // Generate ephemeral key pair
-            KeyPair ephemeralKP = kpg.generateKeyPair();
-            PrivateKey ephemeralPrivateKey = ephemeralKP.getPrivate();
-            PublicKey ephemeralPublicKey = ephemeralKP.getPublic();
+            KeyPair ephemeralKP;
+            PrivateKey ephemeralPrivateKey;
+            PublicKey ephemeralPublicKey;
+            if (options.getEncryptionParams() != null
+                    && options.getEncryptionParams().getEcies() != null
+                    && options.getEncryptionParams().getEcies().getEphemeralKP() != null) {
+                ephemeralKP = options.getEncryptionParams().getEcies().getEphemeralKP();
+                ephemeralPrivateKey = ephemeralKP.getPrivate();
+            } else {
+                ephemeralKP = kpg.generateKeyPair();
+                ephemeralPrivateKey = ephemeralKP.getPrivate();
+                ephemeralPublicKey = ephemeralKP.getPublic();
+                String sharePublicKey = Base64.toBase64String(ephemeralPublicKey.getEncoded());
 
+                EncryptionParams encryptionParams = new EncryptionParams();
+                encryptionParams.setEcies(new ECIESInfo(ephemeralKP, sharePublicKey));
+                options.setEncryptionParams(encryptionParams);
+            }
             // Compute shared secrets
             byte[] sharedSecret1 = ecdhSharedSecret(ephemeralPrivateKey, recipientPublicKey);
             byte[] sharedSecret2 = ecdhSharedSecret(senderPrivateKey, recipientPublicKey);
@@ -99,11 +112,6 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
             System.arraycopy(ciphertext, 0, output, nonce.length, ciphertext.length);
 
             String base64Ciphertext = java.util.Base64.getEncoder().encodeToString(output);
-            String sharePublicKey = Base64.toBase64String(ephemeralPublicKey.getEncoded());
-
-            EncryptionParams encryptionParams = new EncryptionParams();
-            encryptionParams.setEcies(new ECIESInfo(sharePublicKey));
-            options.setEncryptionParams(encryptionParams);
             options.setSecuredPayload(base64Ciphertext);
             return base64Ciphertext;
         } catch (Exception ex) {
@@ -114,7 +122,6 @@ public class EciesSecp384r1TubitakExecutor extends EciesExecutor {
     @Override
     public String decrypt(EncryptionAndDecryptionOptions options) throws EncryptionException {
         try {
-
             if (options.getSecuredPayload() == null || options.getSecuredPayload().isEmpty()) {
                 return options.getSecuredPayload();
             }
