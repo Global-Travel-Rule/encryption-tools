@@ -8,13 +8,12 @@
 package com.globaltravelrule.encryption.impl.bouncycastle.utils;
 
 import com.globaltravelrule.encryption.core.options.GenerateKeyPairOptions;
+import com.globaltravelrule.encryption.impl.bouncycastle.constants.KeyConstant;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
-import org.bouncycastle.crypto.params.X25519PublicKeyParameters;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
@@ -44,26 +43,6 @@ public class CryptoUtils {
 
     private static final Logger log = LoggerFactory.getLogger(CryptoUtils.class);
 
-    // Convert Ed25519 public key to Curve25519 public key
-    public static X25519PublicKeyParameters convertEd25519ToCurve25519(Ed25519PublicKeyParameters edPublicKey) {
-        byte[] edPub = edPublicKey.getEncoded();
-        byte[] xPub = new byte[32];
-
-        // 1. Decoding Ed25519 public key into curve points
-        // (The actual implementation requires more complex mathematical operations, which are simplified here)
-
-        // 2. Convert Edwards coordinates to Montgomery coordinates
-        // This should be the actual mathematical conversion code
-
-        // 3. Encoded as X25519 public key
-        // Simplified Example - In practical applications, it is necessary to fully implement mathematical transformations
-        System.arraycopy(edPub, 0, xPub, 0, 32);
-
-        // Correction of symbol bits (an important step in actual conversion)
-        xPub[31] &= 0x7F;
-        return new X25519PublicKeyParameters(xPub);
-    }
-
     // PublicKey to PEM format
     public static String publicKeyToPEM(PublicKey publicKey) throws Exception {
         StringWriter writer = new StringWriter();
@@ -84,6 +63,20 @@ public class CryptoUtils {
 
     // PEM to PublicKey
     public static PublicKey pemToPublicKey(String pemPublicKey) throws Exception {
+        // help to wrap the header if not exists
+        if (!pemPublicKey.contains("-----BEGIN")) {
+            StringBuilder pemBuilder = new StringBuilder();
+            pemBuilder.append("-----BEGIN CERTIFICATE-----\n");
+            // new line every 64b
+            int index = 0;
+            while (index < pemPublicKey.length()) {
+                int endIndex = Math.min(index + KeyConstant.PEM_NEW_LINE_LENGTH, pemPublicKey.length());
+                pemBuilder.append(pemPublicKey, index, endIndex).append("\n");
+                index = endIndex;
+            }
+            pemBuilder.append("-----END CERTIFICATE-----\n");
+            pemPublicKey = pemBuilder.toString();
+        }
         try (PEMParser pemParser = new PEMParser(new StringReader(pemPublicKey))) {
             Object obj = pemParser.readObject();
             if (obj instanceof X509CertificateHolder) {
