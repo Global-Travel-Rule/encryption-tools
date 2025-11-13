@@ -19,6 +19,7 @@ requirements.
     - ecies_secp256k1
     - ecies_sect571k1
     - ecies_secp384r1_tubitak
+  - ecies_secp256k1_sygna
 - Simple and intuitive Java API
 - Encryption and decryption support full-text, field, or recursive JSON string fields -
   see [EncryptionFormat.java](core/src/main/java/com/globaltravelrule/encryption/core/enums/EncryptionFormat.java)
