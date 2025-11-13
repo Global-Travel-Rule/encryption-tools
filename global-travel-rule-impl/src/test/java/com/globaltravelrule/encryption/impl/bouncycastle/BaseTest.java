@@ -34,7 +34,8 @@ public class BaseTest {
             EncryptionAlgorithm.ECIES_SECP521R1.getName(),
             EncryptionAlgorithm.ECIES_SECP256K1.getName(),
             EncryptionAlgorithm.ECIES_SECT571K1.getName(),
-            EncryptionAlgorithm.ECIES_SECP384R1_TUBITAK.getName());
+            EncryptionAlgorithm.ECIES_SECP384R1_TUBITAK.getName(),
+            EncryptionAlgorithm.ECIES_SECP256R1_SYGNA.getName());
 
     public void doTestEncryptAndDecrypt(EncryptionAlgorithm algorithm) {
         System.out.println("------ start encrypt and decrypt for:" + algorithm.getName());
