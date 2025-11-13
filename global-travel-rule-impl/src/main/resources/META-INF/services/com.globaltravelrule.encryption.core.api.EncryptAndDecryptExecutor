@@ -14,4 +14,4 @@ com.globaltravelrule.encryption.impl.bouncycastle.EciesSect571k1Executor
 com.globaltravelrule.encryption.impl.bouncycastle.Keccak256HashExecutor
 com.globaltravelrule.encryption.impl.bouncycastle.RsaOaepSha1Mfg1Executor
 com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp384r1TubitakExecutor
-com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp256r1SygnaExecutor
+com.globaltravelrule.encryption.impl.bouncycastle.EciesSecp256k1SygnaExecutor

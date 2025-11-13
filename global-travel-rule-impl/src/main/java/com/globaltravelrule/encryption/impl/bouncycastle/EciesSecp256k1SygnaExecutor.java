@@ -38,7 +38,7 @@ import java.util.Arrays;
  * @version 1.0.1
  * @since 1.0.1
  */
-public class EciesSecp256r1SygnaExecutor extends EciesExecutor {
+public class EciesSecp256k1SygnaExecutor extends EciesExecutor {
 
     private static final int IV_LENGTH = 16;
     private static final int MAC_LENGTH = 20; // HMAC-SHA1 output length in bytes
@@ -46,7 +46,7 @@ public class EciesSecp256r1SygnaExecutor extends EciesExecutor {
 
     @Override
     public EncryptionAlgorithm getCryptionAlgorithm() {
-        return EncryptionAlgorithm.ECIES_SECP256R1_SYGNA;
+        return EncryptionAlgorithm.ECIES_SECP256K1_SYGNA;
     }
 
     @Override
